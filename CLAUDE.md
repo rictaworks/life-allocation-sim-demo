@@ -58,6 +58,7 @@ Claude Code がこのリポジトリで作業するときの指示。仕様の�
 issue > setting & coding > security review > add, commit, push > reviewer & pr-checker > merge > user test
 ```
 
+- 作業を始めるときは、`git pull --ff-only` で最新を取り込み、HEAD が `origin/main` と一致することを確認する。食い違えば作業を止めて報告する。
 - デモ版のため、code-review・audit・security-gate・正式 release・report は省略する。代わりに「公開前チェック」を手で行う。
 - 実装は `requirements.md` 2章どおり 1 Issue で行う。
 - `src/**` の変更は必ず PR を作る。`src/**` 以外（ドキュメント・`SPEC/` など）は `main` へ直接 push してよい。その前にも「公開前チェック」を行う。
