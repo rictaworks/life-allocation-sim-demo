@@ -1,0 +1,32 @@
+# rails new の --skip-git は .gitignore を作らないため、Rails 8.1 のひな形に合わせて置く。
+# パスは src/backend からの相対。リポジトリ直下の .gitignore（秘密情報の除外など）も併せて効く。
+
+# bundler の設定とインストール先
+/.bundle
+/vendor/bundle
+
+# 環境変数のファイル（名前の一覧はリポジトリ直下の .env.example）
+/.env*
+
+# ログと一時ファイル
+/log/*
+/tmp/*
+!/log/.keep
+!/tmp/.keep
+
+# pid ファイル（ディレクトリは残す）
+/tmp/pids/*
+!/tmp/pids/
+!/tmp/pids/.keep
+
+# アップロードしたファイルと SQLite のファイル
+/storage/*
+!/storage/.keep
+/tmp/storage/*
+!/tmp/storage/
+!/tmp/storage/.keep
+/db/*.sqlite3*
+
+# 認証情報を復号する鍵
+/config/master.key
+/config/credentials/*.key

@@ -1,0 +1,12 @@
+{
+  "name": "life-allocation-sim-demo-e2e",
+  "version": "0.0.0",
+  "private": true,
+  "description": "life-allocation-sim-demo の E2E テスト（Playwright）",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.0"
+  }
+}
