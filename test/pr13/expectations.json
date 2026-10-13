@@ -1,0 +1,134 @@
+{
+  "pullRequest": 13,
+  "baseRef": "origin/main",
+  "nestedRunGuardEnv": "PR13_CHECK_NESTED",
+  "timeoutsMs": {
+    "git": 30000,
+    "gh": 60000,
+    "dotnetTest": 600000,
+    "dotnetMsbuild": 120000,
+    "rspec": 300000,
+    "bundleRuby": 120000,
+    "railsRunner": 180000,
+    "rubyYaml": 60000,
+    "npmCi": 300000,
+    "playwrightList": 120000
+  },
+  "childEnv": {
+    "git": { "GIT_OPTIONAL_LOCKS": "0" },
+    "gh": { "GH_PROMPT_DISABLED": "1", "GH_NO_UPDATE_NOTIFIER": "1", "NO_COLOR": "1" },
+    "dotnet": {
+      "DOTNET_CLI_UI_LANGUAGE": "en",
+      "DOTNET_NOLOGO": "1",
+      "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+      "MSBUILDDISABLENODEREUSE": "1"
+    },
+    "npm": {
+      "npm_config_loglevel": "notice",
+      "npm_config_audit": "true",
+      "npm_config_fund": "false",
+      "npm_config_update_notifier": "false"
+    },
+    "rspec": { "RAILS_ENV": "test" }
+  },
+  "core": {
+    "testProject": "src/core/DomainCore.Tests",
+    "project": "src/core/DomainCore/DomainCore.csproj",
+    "requiredPassedTests": [
+      "DomainCore.Tests.ToolchainTests.TargetFrameworkIsNetStandard21",
+      "DomainCore.Tests.ToolchainTests.LangVersionIsAtMostNine"
+    ],
+    "targetFramework": "netstandard2.1",
+    "maxLangVersion": 9
+  },
+  "backend": {
+    "dir": "src/backend",
+    "requiredExampleKeyword": "api_only",
+    "dotenvGem": "dotenv-rails",
+    "dotenvGroups": ["development", "test"],
+    "dotenvByRailsEnv": [
+      { "railsEnv": "production", "loaded": false, "extraEnv": { "SECRET_KEY_BASE_DUMMY": "1" } },
+      { "railsEnv": "development", "loaded": true, "extraEnv": {} },
+      { "railsEnv": "test", "loaded": true, "extraEnv": {} }
+    ]
+  },
+  "e2e": {
+    "dir": "test",
+    "playwrightPackage": "@playwright/test",
+    "playwrightBin": "playwright"
+  },
+  "ci": {
+    "workflowFile": ".github/workflows/ci.yml",
+    "workflowName": "CI",
+    "requiredJobs": ["core", "backend"],
+    "pushBranch": "main",
+    "permissions": { "contents": "read" },
+    "allowedJobPermissionValues": ["read", "none"]
+  },
+  "envExample": {
+    "file": ".env.example",
+    "requiredNames": ["APP_ENV", "SECRET_KEY_BASE", "DATABASE_PATH", "APP_ORIGIN", "CORE_HOST_DLL"]
+  },
+  "readme": {
+    "file": "README.md",
+    "requiredCommands": ["dotnet test src/core/DomainCore.Tests", "bundle exec rspec", "npm ci"]
+  },
+  "gitignore": {
+    "file": ".gitignore",
+    "groups": [
+      {
+        "title": ".NET の bin・obj は除外される（src/core・src/core-host）",
+        "cases": [
+          { "path": "src/core/DomainCore/bin/Debug/netstandard2.1/DomainCore.dll", "ignored": true },
+          { "path": "src/core/DomainCore/obj/project.assets.json", "ignored": true },
+          { "path": "src/core/DomainCore.Tests/bin/Debug/net8.0/DomainCore.Tests.dll", "ignored": true },
+          { "path": "src/core/DomainCore.Tests/obj/project.assets.json", "ignored": true },
+          { "path": "src/core-host/CoreHost/bin/Debug/net8.0/CoreHost.dll", "ignored": true },
+          { "path": "src/core-host/CoreHost/obj/project.assets.json", "ignored": true }
+        ]
+      },
+      {
+        "title": ".NET の csproj は除外されない（Unity の csproj の除外は残る）",
+        "cases": [
+          { "path": "src/core/DomainCore/DomainCore.csproj", "ignored": false },
+          { "path": "src/core/DomainCore.Tests/DomainCore.Tests.csproj", "ignored": false },
+          { "path": "src/core-host/CoreHost/CoreHost.csproj", "ignored": false },
+          { "path": "src/unity/Assembly-CSharp.csproj", "ignored": true }
+        ]
+      },
+      {
+        "title": "Rails の bin スタブは除外されず、log・tmp・storage・SQLite は除外される（src/backend）",
+        "cases": [
+          { "path": "src/backend/bin/rails", "ignored": false },
+          { "path": "src/backend/log/development.log", "ignored": true },
+          { "path": "src/backend/log/test.log", "ignored": true },
+          { "path": "src/backend/log/production.log", "ignored": true },
+          { "path": "src/backend/log/.keep", "ignored": false },
+          { "path": "src/backend/tmp/local_secret.txt", "ignored": true },
+          { "path": "src/backend/tmp/pids/server.pid", "ignored": true },
+          { "path": "src/backend/tmp/.keep", "ignored": false },
+          { "path": "src/backend/storage/test.sqlite3", "ignored": true },
+          { "path": "src/backend/storage/production.sqlite3", "ignored": true },
+          { "path": "src/backend/storage/.keep", "ignored": false },
+          { "path": "src/backend/db/development.sqlite3", "ignored": true }
+        ]
+      },
+      {
+        "title": "機密ファイルは除外され、.env.example は除外されない",
+        "cases": [
+          { "path": "src/backend/config/master.key", "ignored": true },
+          { "path": ".env", "ignored": true },
+          { "path": "src/backend/.env", "ignored": true },
+          { "path": ".env.example", "ignored": false }
+        ]
+      }
+    ]
+  },
+  "secretFiles": {
+    "names": [".env", "master.key"],
+    "prefixes": [".env."],
+    "suffixes": [".key", ".pem"],
+    "allowedNames": [".env.example"],
+    "allowedSuffixes": [".pub.key"]
+  }
+}

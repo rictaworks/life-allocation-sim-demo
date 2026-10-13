@@ -77,3 +77,13 @@ Thumbs.db
 # --- テスト・カバレッジ ---
 coverage/
 .rspec_status
+
+# --- .NET（Domain Core・再計算ホスト。範囲を src/core と src/core-host に限定する） ---
+# 裸の bin/ にすると src/backend/bin/（Rails の bin スタブ）まで除外されるため、範囲を絞る
+src/core/**/bin/
+src/core/**/obj/
+src/core-host/**/bin/
+src/core-host/**/obj/
+# 上の Unity 向けの *.csproj の除外から、.NET のプロジェクトファイルだけを外す
+!src/core/**/*.csproj
+!src/core-host/**/*.csproj

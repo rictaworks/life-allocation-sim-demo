@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <!-- xUnit.net v3 のテストプロジェクトは実行ファイルとしてビルドする -->
+    <OutputType>Exe</OutputType>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <!--
+    xunit.v3 は Microsoft Testing Platform v2 を含み、.NET 10 以降の SDK では VSTest モードの dotnet test を拒否する。
+    SDK の版によらず dotnet test（VSTest）で動かすため、Microsoft Testing Platform を含まない xunit.v3.mtp-off を使う。
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
+    <PackageReference Include="xunit.v3.mtp-off" Version="4.0.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.1">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DomainCore\DomainCore.csproj" />
+  </ItemGroup>
+
+</Project>
