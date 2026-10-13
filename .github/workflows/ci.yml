@@ -19,10 +19,20 @@ jobs:
         with:
           persist-credentials: false
       - uses: actions/setup-dotnet@v6
+        id: setup-dotnet
         with:
           dotnet-version: '8.0.x'
+      # ランナーには新しい SDK も入っているため、setup-dotnet が入れた .NET 8 の SDK に固定する（setup-dotnet の README の手順）
+      - name: .NET 8 の SDK に固定する
+        env:
+          DOTNET_SDK_VERSION: ${{ steps.setup-dotnet.outputs.dotnet-version }}
+        run: |
+          test -n "$DOTNET_SDK_VERSION"
+          printf '{"sdk":{"version":"%s"}}\n' "$DOTNET_SDK_VERSION" > global.json
       - name: Domain Core のテスト
-        run: dotnet test src/core/DomainCore.Tests
+        run: |
+          dotnet --version
+          dotnet test src/core/DomainCore.Tests
 
   backend:
     name: backend
