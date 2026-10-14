@@ -2,7 +2,7 @@ Rails.application.routes.draw do
   # 死活確認。200 を返すだけで、状態を変えない。
   get "up" => "rails/health#show", as: :rails_health_check
 
-  # 状態を変えるのは POST だけ。GET は状態を読むだけ（GET /api/game は頻度の記録だけを書く）。
+  # 状態を変えるのは POST だけ。GET は状態を読むだけで、頻度も数えず、記録も残さない（GET /api/game）。
   namespace :api do
     # 匿名セッションの発行。
     resource :session, only: :create

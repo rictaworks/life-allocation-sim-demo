@@ -62,6 +62,24 @@ RSpec.describe "POST /api/session", type: :request do
       expect(response).to have_http_status(:created)
     end
 
+    it "利用しても寿命は延びない（発行から 7 日で切れ、利用のたびに延ばさない）" do
+      token = travel_to(now) { issue_session_token }
+
+      travel_to(now + 6.days) do
+        get "/api/game", headers: { "Cookie" => cookie_header(token) }
+        expect(response).to have_http_status(:ok)
+
+        post_session(headers: { "Cookie" => cookie_header(token) })
+        expect(response).to have_http_status(:ok)
+      end
+      expect(Session.sole.expires_at).to eq(now + 7.days)
+
+      travel_to(now + 7.days + 1.second) do
+        post_session(headers: { "Cookie" => cookie_header(token) })
+      end
+      expect(response).to have_http_status(:created)
+    end
+
     it "一致しない Cookie の値は無効。新規として 201 を返す" do
       post_session(headers: { "Cookie" => cookie_header("x" * 43) })
 
@@ -239,6 +257,37 @@ RSpec.describe "POST /api/session", type: :request do
         post_session(headers: { "Origin" => "http://localhost:8080" })
 
         expect(response).to have_http_status(:forbidden)
+      end
+    end
+
+    it "新規の発行の頻度は同じに働く（IP あたり 1 分 10 件。11 件目は 429 で、セッションは作らない）" do
+      with_env("APP_ENV" => "development") do
+        travel_to(now) do
+          10.times { issue_session_token }
+          post_session
+        end
+
+        expect(response).to have_http_status(429)
+        expect(error_code).to eq("rate_limited")
+        expect(Session.count).to eq(10)
+      end
+    end
+
+    it "CORS のヘッダーは付けず、開発用の localhost のオリジンのプリフライトにも応答しない" do
+      with_env("APP_ENV" => "development") do
+        post_session
+        expect(response.headers.keys.grep(/\Aaccess-control-/i)).to be_empty
+
+        preflight = Rack::MockRequest.new(Rails.application).options(
+          "/api/session",
+          "HTTP_ORIGIN" => "http://localhost:8080",
+          "HTTP_ACCESS_CONTROL_REQUEST_METHOD" => "POST",
+          "HTTPS" => "on",
+          "HTTP_HOST" => "www.example.com"
+        )
+
+        expect(preflight.status).to eq(404)
+        expect(preflight.headers.keys.grep(/\Aaccess-control-/i)).to be_empty
       end
     end
   end

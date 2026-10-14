@@ -1,5 +1,6 @@
 require "rails_helper"
 require "erb"
+require "ripper"
 require "puma"
 require "puma/configuration"
 
@@ -45,10 +46,30 @@ RSpec.describe "サーバーの設定ファイル（config/server.yml の値と�
   end
 
   describe "config/environments/production.rb（ログの水準）" do
-    it "水準は ServerSettings.log_level（config/server.yml の値、RAILS_LOG_LEVEL で上書き）を使う" do
+    # 行ごとのコード（空白・コメント・埋め込みのドキュメント・文字列の中身を除き、残りのトークンをつなぐ）。
+    # コメントアウトされた行や、文字列の中の同じ文字は、コードの行としては数えない。
+    def code_lines(source)
+      skipped = %i[on_sp on_nl on_ignored_nl on_comment on_embdoc_beg on_embdoc on_embdoc_end on_tstring_content]
+      Ripper.lex(source)
+            .reject { |(_position, type, _text)| skipped.include?(type) }
+            .group_by { |(position, _type, _text)| position.first }
+            .values
+            .map { |tokens| tokens.map { |(_position, _type, text)| text }.join }
+    end
+
+    it "水準は ServerSettings.log_level（config/server.yml の値、RAILS_LOG_LEVEL で上書き）を、コードとして使う" do
       source = File.read(Rails.root.join("config/environments/production.rb"))
 
-      expect(source).to include("config.log_level = ServerSettings.log_level")
+      expect(code_lines(source)).to include("config.log_level=ServerSettings.log_level")
+    end
+
+    it "検査の検査：コメント・埋め込みのドキュメント・文字列の中の同じ文は、コードの行として数えない" do
+      statement = "config.log_level=ServerSettings.log_level"
+
+      expect(code_lines("  config.log_level = ServerSettings.log_level\n")).to include(statement)
+      expect(code_lines("# config.log_level = ServerSettings.log_level\n")).not_to include(statement)
+      expect(code_lines("=begin\nconfig.log_level = ServerSettings.log_level\n=end\n")).not_to include(statement)
+      expect(code_lines(%(puts "config.log_level = ServerSettings.log_level"\n))).not_to include(statement)
     end
   end
 end

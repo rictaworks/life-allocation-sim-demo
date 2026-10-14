@@ -22,10 +22,11 @@ RUN apt-get update -qq && \
     apt-get clean
 
 # Set production environment variables and enable jemalloc for reduced memory usage and latency.
+# 開発用と test のグループ（rspec・rubocop・brakeman・kamal など）は、本番のイメージに入れない。
 ENV RAILS_ENV="production" \
     BUNDLE_DEPLOYMENT="1" \
     BUNDLE_PATH="/usr/local/bundle" \
-    BUNDLE_WITHOUT="development" \
+    BUNDLE_WITHOUT="development:test" \
     LD_PRELOAD="/usr/local/lib/libjemalloc.so"
 
 # Throw-away build stage to reduce size of final image

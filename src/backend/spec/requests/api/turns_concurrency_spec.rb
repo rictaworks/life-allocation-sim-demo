@@ -87,14 +87,14 @@ RSpec.describe "POST /api/games/turns の同時の要求（実際に並行に送
       expect(Game.sole).to have_attributes(current_age: 23, status: "playing")
     end
 
-    it "頻度の制限が効いている状態でも、保存は 1 件のまま（2 件目は 429 か、保存済みの結果の 200）" do
+    it "頻度の制限が効いている（同じ 1 秒の中で送る）と、2 件目は 429 になり、保存は 1 件のまま" do
       token = start_game_for_new_session
 
-      results = send_concurrently(token, [ turn_body(turn_no: 1), turn_body(turn_no: 1) ])
-      statuses = results.map(&:first)
+      # 時刻を固定し、同じ 1 秒の中で送る。2 件目は保存済みの結果（200）ではなく、頻度の制限で 429 になる。
+      results = travel_to(Time.current) { send_concurrently(token, [ turn_body(turn_no: 1), turn_body(turn_no: 1) ]) }
 
-      expect(statuses.count(201)).to eq(1)
-      expect(statuses - [ 200, 201, 429 ]).to be_empty, "想定外のステータス: #{statuses.inspect}"
+      expect(results.map(&:first).sort).to eq([ 201, 429 ])
+      expect(results.find { |status, _body| status == 429 }.last.dig("error", "code")).to eq("rate_limited")
       expect(Turn.where(turn_no: 1).count).to eq(1)
     end
   end

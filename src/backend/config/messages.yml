@@ -6,6 +6,7 @@ shared:
     unexpected_error: "[api] unexpected %{class_name} in %{controller}#%{action}"
     blocked_host: "[api] blocked host: %{hosts}"
     unknown_error_code: "unknown ApiError code: %{code}"
+    unmapped_status: "[api] unmapped status %{status} for %{class_name}"
   turn:
     saved_turn_missing: "[turn] saved turn is missing for a requested replay"
     replay_mismatch: "[turn] replay result does not match the requested turn"

@@ -1,131 +1,151 @@
 require "rails_helper"
 
-# GET /api/game は再計算ホストを呼んで中身を作るため、セッションごとに頻度を制限する（1 秒 2 件・1 分 60 件）。
-# 超過は 429 と Retry-After。超過した要求は、ホストを呼ばない。
-RSpec.describe "GET /api/game の頻度の制限（セッションごと。超過は 429。ホストは呼ばない）", type: :request do
+# GET /api/game は状態を変えない読み取りのため、頻度を数えない（429 にならず、request_events にも残さない）。
+# 再計算ホストの負荷は、同時実行の上限と制限時間で守る（config/core_host.yml）。
+# GET を何度送っても、POST の頻度の制限（ゲームの開始・保存・新規セッション）は従来どおり働く。
+RSpec.describe "GET /api/game は頻度を数えない（429 にならず、記録も残さない）", type: :request do
   include CoreHostFixtures
 
   let(:start) { Time.utc(2026, 10, 14, 12, 0, 0) }
 
   before do
     https!
+    allow(CoreHostClient).to receive(:init).and_return(init_output)
     allow(CoreHostClient).to receive(:replay).and_return(one_year_replay_output)
   end
 
-  # ゲームを 1 件持つセッションを作り、Cookie の値を返す。
+  # ゲームを 1 件持つセッションを作り、Cookie の値を返す（配分の履歴は空）。
   def token_with_game(ip: ApiRequestHelpers::TEST_CLIENT_IP)
     token = travel_to(start) { issue_session_token(ip: ip) }
     Game.create!(session: Session.find_active(token), seed: 12_345, difficulty: "normal", status: "playing", current_age: 22)
     token
   end
 
-  def get_game(token)
-    get "/api/game", headers: { "Cookie" => cookie_header(token) }
+  def get_game(token = nil)
+    get "/api/game", headers: token ? { "Cookie" => cookie_header(token) } : {}
   end
 
-  it "1 秒に 2 件まで。3 件目は 429 と Retry-After。ホストは 2 回だけ呼ぶ" do
-    token = token_with_game
+  def post_game(token)
+    post "/api/games", params: '{"difficulty":"normal"}', headers: write_headers("Cookie" => cookie_header(token))
+  end
 
-    travel_to(start) do
-      2.times do
-        get_game(token)
-        expect(response).to have_http_status(:ok)
+  def post_turn(token, turn_no)
+    body = JSON.generate({ turn_no: turn_no, living_pct: 60, saving_pct: 20, invest_pct: 20, website: "" })
+    post "/api/games/turns", params: body, headers: write_headers("Cookie" => cookie_header(token))
+  end
+
+  describe "読み取り（GET）は数えない" do
+    it "1 秒に 5 件読んでも、どれも 200（429 にならない）。ホストは読んだ件数だけ呼ぶ" do
+      token = token_with_game
+
+      travel_to(start) do
+        5.times do
+          get_game(token)
+          expect(response).to have_http_status(:ok)
+        end
       end
 
-      get_game(token)
+      expect(CoreHostClient).to have_received(:replay).exactly(5).times
     end
 
-    expect(response).to have_http_status(:too_many_requests)
-    expect(error_code).to eq("rate_limited")
-    expect(response.headers["Retry-After"]).to eq("1")
-    expect(CoreHostClient).to have_received(:replay).twice
-  end
+    it "1 分に 61 件読んでも、どれも 200（上限は設けない）" do
+      token = token_with_game
 
-  it "0.999 秒後はまだ読めない。ちょうど 1 秒後は読める（境界）" do
-    token = token_with_game
-    travel_to(start) { 2.times { get_game(token) } }
-
-    travel_to(start + 0.999, with_usec: true) do
-      get_game(token)
-      expect(response).to have_http_status(:too_many_requests)
-    end
-
-    travel_to(start + 1) do
-      get_game(token)
-      expect(response).to have_http_status(:ok)
-    end
-  end
-
-  it "1 分に 60 件まで。1 秒おきの 60 件は通り、59.5 秒後の 61 件目は 429（Retry-After は 1）。60 秒後は読める（境界）" do
-    token = token_with_game
-    60.times do |index|
-      travel_to(start + index) do
-        get_game(token)
-        expect(response).to have_http_status(:ok), "件目=#{index + 1}"
+      travel_to(start) do
+        61.times do |index|
+          get_game(token)
+          expect(response).to have_http_status(:ok), "件目=#{index + 1}"
+        end
       end
     end
 
-    travel_to(start + 59.5, with_usec: true) do
-      get_game(token)
-      expect(response).to have_http_status(:too_many_requests)
-      expect(response.headers["Retry-After"]).to eq("1")
+    it "読み取りでは request_events に 1 行も書かない（ゲームがあっても、無くても）" do
+      token = token_with_game
+      empty_token = travel_to(start) { issue_session_token(ip: "198.51.100.90") }
+
+      expect do
+        travel_to(start) do
+          3.times { get_game(token) }
+          3.times { get_game(empty_token) }
+        end
+      end.not_to change(RequestEvent, :count)
     end
 
-    travel_to(start + 60) do
-      get_game(token)
-      expect(response).to have_http_status(:ok)
-    end
-    expect(CoreHostClient).to have_received(:replay).exactly(61).times
-  end
+    it "ゲームが無くても、有効なセッションの読み取りは 429 にならず、{game: null} を返す" do
+      token = travel_to(start) { issue_session_token(ip: "198.51.100.91") }
 
-  it "別のセッションは別に数える" do
-    first = token_with_game
-    second = token_with_game(ip: "198.51.100.90")
-
-    travel_to(start) do
-      2.times { get_game(first) }
-      get_game(second)
-      expect(response).to have_http_status(:ok)
-    end
-  end
-
-  it "ゲームが無くても、有効なセッションの読み取りは数える（記録は同じ枠）" do
-    token = travel_to(start) { issue_session_token }
-
-    travel_to(start) do
-      2.times do
-        get_game(token)
-        expect(json_response).to eq("game" => nil)
+      travel_to(start) do
+        5.times do
+          get_game(token)
+          expect(response).to have_http_status(:ok)
+          expect(json_response).to eq("game" => nil)
+        end
       end
 
-      get_game(token)
+      expect(CoreHostClient).not_to have_received(:replay)
     end
 
-    expect(response).to have_http_status(:too_many_requests)
-    expect(CoreHostClient).not_to have_received(:replay)
+    it "Cookie が無い・期限切れの読み取りも数えない（{game: null}。ホストは呼ばない）" do
+      expired = travel_to(8.days.ago) { issue_session_token(ip: "198.51.100.92") }
+
+      travel_to(start) do
+        5.times do
+          get_game
+          expect(json_response).to eq("game" => nil)
+          get_game(expired)
+          expect(json_response).to eq("game" => nil)
+        end
+      end
+
+      expect(CoreHostClient).not_to have_received(:replay)
+    end
   end
 
-  it "Cookie が無い・期限切れの要求は数えない（{game: null}。ホストは呼ばない）" do
-    travel_to(start) do
-      25.times do
-        get "/api/game"
-        expect(response).to have_http_status(:ok)
-        expect(json_response).to eq("game" => nil)
+  describe "POST の頻度の制限は、読み取りがあっても従来どおり働く" do
+    it "ゲームの開始は 1 秒 1 件のまま（GET は枠を使わず、2 件目は 429）" do
+      token = travel_to(start) { issue_session_token }
+
+      travel_to(start) do
+        5.times { get_game(token) }
+        post_game(token)
+        expect(response).to have_http_status(:created)
+
+        5.times { get_game(token) }
+        post_game(token)
+        expect(response).to have_http_status(:too_many_requests)
+        expect(error_code).to eq("rate_limited")
+      end
+
+      expect(CoreHostClient).to have_received(:init).once
+    end
+
+    it "保存は 1 秒 1 件のまま（GET は枠を使わず、2 件目は 429。保存は 1 件だけ）" do
+      token = token_with_game
+
+      travel_to(start) do
+        5.times { get_game(token) }
+        post_turn(token, 1)
+        expect(response).to have_http_status(:created)
+
+        5.times { get_game(token) }
+        post_turn(token, 1)
+        expect(response).to have_http_status(:too_many_requests)
+        expect(error_code).to eq("rate_limited")
+      end
+
+      expect(Turn.count).to eq(1)
+    end
+
+    it "新規の発行は IP あたり 1 分 10 件のまま（読み取りは数に入らない。11 件目は 429）" do
+      travel_to(start) do
+        token = issue_session_token
+        20.times { get_game(token) }
+
+        9.times { issue_session_token }
+        post_session
+        expect(response).to have_http_status(:too_many_requests)
+        expect(error_code).to eq("rate_limited")
       end
     end
-
-    expect(RequestEvent.where(kind: "game_read").count).to eq(0)
-    expect(CoreHostClient).not_to have_received(:replay)
-  end
-
-  it "保存するのは HMAC のダイジェストだけ（Cookie の値は保存しない）" do
-    token = token_with_game
-    session = Session.find_active(token)
-
-    get_game(token)
-
-    row = RequestEvent.where(kind: "game_read").sole
-    expect(row.scope_digest).to eq(RequestRateLimit.digest_for(:game_read, session.id))
-    expect(RequestEvent.all.flat_map { |record| record.attributes.values.map(&:to_s) }).not_to include(token)
   end
 end

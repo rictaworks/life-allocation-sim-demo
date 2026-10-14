@@ -11,7 +11,7 @@ require "pathname"
 # 対象外（許す文字列）と、その理由：
 #   a. 記号・空白・改行の区切り（例：", "・"\n"・"[api]" の枠）。英字や数字を含まない。
 #   b. require のパス（Ruby の標準ライブラリと gem の名前）。言語の仕様上の固定語。
-#   c. ハッシュのキー（"k" =>・"k":）、添字（x["k"]）、KEY_CALLS の引数、%w の一覧の英字の語。
+#   c. ハッシュのキー（"k" =>・"k":）、添字（x["k"]）、KEY_CALLS の引数、fetch の第 1 引数、%w の一覧の英字の語。
 #      JSON の項目名（再計算ホストの Protocol.md と、API の応答・要求の項目名）。データの構造の名前であり、
 #      値ではないため設定へ移さない。英字だけの語（識別子の形）に限る。
 #      応答の値・ヘッダー名・環境変数名（Rack の env のキー）は、値として設定へ移す（config/api.yml・config/messages.yml）。
@@ -23,8 +23,11 @@ module HardcodedStringScanner
   # 識別子の形（ハッシュのキー・項目名）。ドット・ハイフンを含むもの（Content-Type など）は、ここには当たらない。
   IDENTIFIER = /\A[A-Za-z_][A-Za-z0-9_]*\z/
   JAPANESE = /[\p{Hiragana}\p{Katakana}\p{Han}]/
-  # 添字・ハッシュの引数として JSON の項目名を受け取るメソッド。環境変数名（get_header・env の参照）は値として扱い、含めない。
-  KEY_CALLS = %w[fetch dig json_params integer_field!].freeze
+  # 引数のすべてが JSON の項目名になるメソッド（json_params・dig・integer_field!）。
+  KEY_CALLS = %w[json_params dig integer_field!].freeze
+  # 第 1 引数だけが項目名になるメソッド。fetch の第 2 引数は既定値なので、英字の語は値として違反にする。
+  # 環境変数名（get_header・env の参照）は値として扱い、含めない。
+  FIRST_ARGUMENT_KEY_CALLS = %w[fetch].freeze
   # 空白・改行・記号だけの区切り（エスケープを外してから見る）。
   SEPARATOR_ONLY = /\A[^A-Za-z0-9\p{Hiragana}\p{Katakana}\p{Han}]*\z/
   # 対象外 d の一覧（ファイルの相対パス → 文字列 → 理由）。ここに無い英字の文字列は違反にする。
@@ -121,8 +124,16 @@ module HardcodedStringScanner
       return true if after && after[1] == :on_op && after[2] == "=>"
       return true if stack.last == [ :index ]
       return true if stack.last&.first == :call && KEY_CALLS.include?(stack.last.last)
+      return true if stack.last&.first == :call && FIRST_ARGUMENT_KEY_CALLS.include?(stack.last.last) && first_argument?(tokens, start)
 
       false
+    end
+
+    # 呼び出しの第 1 引数か（直前の字句が、呼び出しの開き括弧）。
+    def first_argument?(tokens, start)
+      return false if start.zero?
+
+      tokens[start - 1][1] == :on_lparen
     end
 
     def reason_for(piece)
@@ -241,6 +252,10 @@ RSpec.describe "文字列リテラルの分離" do
 
     it "%w の一覧の項目名は対象外にする" do
       expect(offenses_of(%(KEYS = %w[turn_no living_pct]\n))).to eq([])
+    end
+
+    it "fetch の第 2 引数（既定値）の英字の語は違反にする（項目名は第 1 引数だけ）" do
+      expect(offenses_of(%(value = params.fetch("website", "created")\n))).to eq([ "created" ])
     end
 
     it "添字でも項目名でもない英字の値は、ハッシュの中でも違反にする" do

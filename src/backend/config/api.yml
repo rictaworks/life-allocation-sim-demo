@@ -38,8 +38,5 @@ shared:
     turn_save:
       - { window_seconds: 1, limit: 1 }
       - { window_seconds: 60, limit: 20 }
-    # 現在のゲームの取得（GET /api/game）は、ゲームがあるときに再計算ホストを呼ぶ。同時実行の枠を占有させないため、
-    # 有効なセッションごとに数える（保存・開始の枠とは別に数える）。
-    game_read:
-      - { window_seconds: 1, limit: 2 }
-      - { window_seconds: 60, limit: 60 }
+    # 現在のゲームの取得（GET /api/game）は、状態を変えない読み取りのため、頻度を数えない（規則は置かない）。
+    # ホストの負荷は、再計算ホストの同時実行の上限と制限時間で守る（core_host の設定）。

@@ -7,12 +7,14 @@ class RequestRateLimit
   class << self
     # 制限内なら、その要求を記録するだけにする（処理は呼び出し側が、記録の後で行う）。超過なら ApiError(:rate_limited)。
     # 重い処理（再計算ホストの呼び出しなど）は、書き込みの枠を握ったまま行わないため、先にこちらを使う。
+    # 状態を変える POST（ゲームの開始・保存）だけが使う。GET は数えないため、ここを通さない。
     def consume!(kind:, key:)
       perform(kind: kind, key: key) { nil }
     end
 
     # 制限内なら block を実行し、その要求を記録する。超過なら ApiError(:rate_limited) を投げ、何も記録しない。
-    # key は数える単位（接続元 IP の正規化した文字列、セッションの ID など）。
+    # key は数える単位（接続元 IP の正規化した文字列、セッションの ID など）。kind は config/api.yml の rate_limits の種類だけ
+    # （規則の無い種類は KeyError。既定値では補わない）。
     def perform(kind:, key:)
       rules = ApiSettings.rate_limit_rules(kind)
       digest = digest_for(kind, key)
