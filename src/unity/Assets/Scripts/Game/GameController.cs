@@ -36,8 +36,12 @@ namespace LifeAllocationSim.Game
         {
             Exchange(api.GetGame, response =>
             {
-                var game = JsonFields.Token(response.ParseBody(), ApiConfig.KeyGame);
-                hasSavedGame = game.Type == JTokenType.Object;
+                if (!TryReadSavedGame(response.ParseBody(), LoadStatus, out var game))
+                {
+                    return;
+                }
+
+                hasSavedGame = game != null;
                 ShowTitle(null);
             }, LoadStatus);
         }
@@ -59,8 +63,12 @@ namespace LifeAllocationSim.Game
         {
             Exchange(api.GetGame, response =>
             {
-                var game = JsonFields.Token(response.ParseBody(), ApiConfig.KeyGame);
-                if (game.Type == JTokenType.Null)
+                if (!TryReadSavedGame(response.ParseBody(), ResumeGame, out var game))
+                {
+                    return;
+                }
+
+                if (game == null)
                 {
                     hasSavedGame = false;
                     session = null;
@@ -68,7 +76,7 @@ namespace LifeAllocationSim.Game
                     return;
                 }
 
-                if (!Restore(GameDto.FromJson(JsonFields.AsObject(game, ApiConfig.KeyGame))))
+                if (!Restore(GameDto.FromJson(game)))
                 {
                     return;
                 }
@@ -76,6 +84,32 @@ namespace LifeAllocationSim.Game
                 hasSavedGame = true;
                 ShowCurrent();
             }, ResumeGame);
+        }
+
+        /// <summary>
+        /// 保存 API の応答から game を読む。JSON の null は「保存なし」（game は null、戻り値は true）。
+        /// オブジェクトは「保存あり」（戻り値は true）。それ以外の型は想定外として、型名をログに残し、
+        /// 汎用の文言のエラーを出す（戻り値は false）。「保存なし」と見なすのは JSON の null だけ。
+        /// </summary>
+        private bool TryReadSavedGame(JObject body, Action retry, out JObject game)
+        {
+            var token = JsonFields.Token(body, ApiConfig.KeyGame);
+            if (token.Type == JTokenType.Null)
+            {
+                game = null;
+                return true;
+            }
+
+            if (token is JObject value)
+            {
+                game = value;
+                return true;
+            }
+
+            Debug.LogWarning(string.Format(LogTexts.FieldTypeUnexpected, ApiConfig.KeyGame, token.Type));
+            ShowError(UiTexts.ErrorGeneric, retry, UiTexts.Retry);
+            game = null;
+            return false;
         }
 
         private void ShowOverwriteConfirm(string difficultyCode)
@@ -223,8 +257,13 @@ namespace LifeAllocationSim.Game
                 return;
             }
 
-            var code = response.ErrorCode ?? string.Empty;
-            Debug.LogWarning(string.Format(LogTexts.ApiErrorResponse, response.StatusCode, code));
+            // code が無い（本文を読めない・code の項目が無い）ときは null のまま扱う。null はどの code にも一致しないので、
+            // 状態コードによる文言（429・503）か、最後の汎用の文言になる。空の文字列で代えて一致させることはしない
+            var code = response.ErrorCode;
+            Debug.LogWarning(string.Format(
+                LogTexts.ApiErrorResponse,
+                response.StatusCode,
+                code == null ? LogTexts.ErrorCodeMissing : code));
             // 404 と、ゲームの途中で session が無くなった 401 は、データがリセットされたものとして新規開始へ誘導する
             if (code == ApiConfig.ErrorGameNotFound || (inGame && code == ApiConfig.ErrorSessionRequired))
             {

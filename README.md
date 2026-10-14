@@ -192,6 +192,8 @@ Unity の版は 6000.0.34f1 です。2022.3 LTS 系ではなく、6000 系を使
 
 ### ビルド
 
+ビルドの前に、環境変数 `UNITY_EXE` に Unity.exe の場所（WSL から見たパス）を設定します。`UNITY_EXE` は必須です。未設定のときは、ビルドを始めずにエラーで止まります。値は各自の環境で設定し、この文書やスクリプトには書きません。
+
 リポジトリのルートで実行します（約 10 分かかります）。
 
 ```bash
@@ -199,8 +201,9 @@ bash src/unity/tools/build-webgl.sh
 ```
 
 - Unity は WSL のフォルダ（大文字と小文字を区別するファイルシステム）にあるプロジェクトを開けないため、Windows 側の作業フォルダでビルドします。既定の作業フォルダは `%TEMP%\LifeAllocationSim-unity-build` です。
+- 作業フォルダは使い捨てです。ビルドのたびに `src/unity` の内容で上書きされるため、作業フォルダの中で手で変えた内容は残りません。ビルドの途中で `src/unity` を手で変えないでください。終わりに、Unity が作った `.meta`・シーン・ProjectSettings で上書きします。
 - ログは作業フォルダの `build.log` に出ます。終了コードが 0 でなければ、ログ末尾のエラーを表示して止まります。
-- 環境変数で変えられます。`UNITY_EXE`（Unity.exe の場所）と `LASD_UNITY_WORK`（作業フォルダ。既存の作業フォルダを使うと、Library の取り込みを再利用できます）。
+- 環境変数：`UNITY_EXE`（必須：Unity.exe の場所）と、`LASD_UNITY_WORK`（省略可：作業フォルダ。既存の作業フォルダを使うと、Library の取り込みを再利用できます）。
 - 出力は `src/web/unity/` に置かれます。Git には載りません。
 
 ### DLL だけを更新する
@@ -224,7 +227,7 @@ Domain Core を Release でビルドし、`bin/Release/netstandard2.1/DomainCore
 node --test src/unity/tests/static-checks.test.mjs
 ```
 
-Unity の自動テストは作っていません。規則は Domain Core のテストで検査し、Unity 側は、数値の直書きや禁止した API を使っていないかを静的に検査します。
+Unity の自動テストは作っていません。規則は Domain Core のテストで検査し、Unity 側は、数値の直書きや禁止した API を使っていないかを静的に検査します。あわせて、例外の握りつぶし、`??` の既定値、static の可変フィールド、外部の JavaScript・ネイティブの呼び出し（ExternalEval・DllImport など）を検査します。
 
 ### 確認の範囲
 

@@ -1,20 +1,21 @@
 #!/usr/bin/env bash
 # Unity 6000.0.34f1 で WebGL をビルドし、出力を src/web/unity/ に置く（WSL から Windows 側の Unity.exe を呼ぶ）。
 #
-# 使い方（リポジトリのルートで）： bash src/unity/tools/build-webgl.sh
-# 環境変数（省略可）：
-#   UNITY_EXE        Unity.exe の場所（既定：Unity Hub の 6000.0.34f1）
-#   LASD_UNITY_WORK  Windows 側の作業フォルダ（既定：%TEMP%\LifeAllocationSim-unity-build）
+# 使い方（リポジトリのルートで。UNITY_EXE の設定が必要）： bash src/unity/tools/build-webgl.sh
+# 環境変数：
+#   UNITY_EXE        Unity.exe の場所（WSL から見たパス）。必須。未設定なら、ビルドを始めずに止まる
+#   LASD_UNITY_WORK  Windows 側の作業フォルダ（省略可。既定：%TEMP%\LifeAllocationSim-unity-build）
 #
 # 仕組み：
 #   Unity は大文字と小文字を区別するファイルシステム上のプロジェクトを開けないため（WSL のフォルダは不可）、
 #   src/unity の Assets・Packages・ProjectSettings を Windows 側の作業フォルダへ上書きコピーし、そこでビルドする。
+#   作業フォルダは使い捨てで、毎回 src/unity の内容で上書きされる（作業フォルダの中で手で変えた内容は残らない）。
 #   ビルド後に生成物（.meta・シーン・packages-lock.json・ProjectSettings）を src/unity へ戻し、出力を src/web/unity/ へ置く。
+#   戻すときは上書きする。ビルドの途中で src/unity を手で変えると、その変更は失われるので、ビルド中は編集しない。
 #   削除はしない。作業フォルダにだけ残ったソースは一覧で示して止まるので、内容を確認してから手動で削除してください。
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-UNITY_EXE="${UNITY_EXE:-/mnt/c/Program Files/Unity/Hub/Editor/6000.0.34f1/Editor/Unity.exe}"
 EXECUTE_METHOD="LifeAllocationSim.Editor.WebGLBuild.Build"
 # Unity は出力のファイル名を出力フォルダの名前から決める。製品名（BuildConfig.ProductName）と一致させる
 PRODUCT_NAME="LifeAllocationSim"
@@ -25,6 +26,11 @@ REQUIRED_FILES=(
   "Build/LifeAllocationSim.data"
   "Build/LifeAllocationSim.wasm"
 )
+
+if [ -z "${UNITY_EXE:-}" ]; then
+  echo "UNITY_EXE が設定されていません。Unity.exe の場所（WSL から見たパス）を環境変数で指定して、もう一度実行してください（README の Unity の節を参照）。" >&2
+  exit 1
+fi
 
 if [ ! -f "$UNITY_EXE" ]; then
   echo "Unity.exe が見つかりません: $UNITY_EXE（UNITY_EXE で場所を指定できます）" >&2
@@ -74,7 +80,8 @@ if [ "$UNITY_STATUS" -ne 0 ]; then
   exit "$UNITY_STATUS"
 fi
 
-# 5. 生成物を src/unity へ戻す（.meta・シーン・packages-lock.json・ProjectSettings）
+# 5. 生成物を src/unity へ戻す（.meta・シーン・packages-lock.json・ProjectSettings）。
+#    ビルドの途中で src/unity の同じファイルを手で変えていた場合は、ここで上書きされる（一覧で止まる仕組みは無い）
 (cd "$WORK" && find Assets -type f \( -name '*.meta' -o -name '*.unity' \) -not -path 'Assets/Plugins/*' -exec cp --parents {} "$ROOT/src/unity/" \;)
 cp -f "$WORK/Packages/packages-lock.json" "$ROOT/src/unity/Packages/"
 cp -f "$WORK/ProjectSettings/"*.asset "$WORK/ProjectSettings/ProjectVersion.txt" "$ROOT/src/unity/ProjectSettings/"

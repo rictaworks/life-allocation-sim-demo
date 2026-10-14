@@ -341,3 +341,206 @@ test('日本語の表示に使うフォントと、そのライセンス（OFL�
   assert.ok(existsSync(license), 'ライセンスが無い');
   assert.match(readFileSync(license, 'utf8'), /SIL OPEN FONT LICENSE/);
 });
+
+// ---------------------------------------------------------------------------
+// 指摘 1・3・5・22 の検査：例外の握りつぶし・?? の既定値・static の可変フィールド・外部の呼び出し、
+// 保存の有無の判定、UNITY_EXE の既定値。
+// 検出器は C# の本文を読む。コメントと文字列・文字リテラルの中身を空白にしてから、違反の行番号を返す。
+// ---------------------------------------------------------------------------
+
+// C# の本文から、コメントと文字列・文字リテラルの中身を空白にする（改行は残し、行番号を保つ）
+function csharpCode(source) {
+  const blank = (text) => text.replace(/[^\n]/g, ' ');
+  let out = '';
+  let i = 0;
+  const n = source.length;
+  while (i < n) {
+    const c = source[i];
+    const next = source[i + 1];
+    if (c === '/' && next === '/') {
+      const end = source.indexOf('\n', i);
+      const stop = end === -1 ? n : end;
+      out += blank(source.slice(i, stop));
+      i = stop;
+    } else if (c === '/' && next === '*') {
+      const end = source.indexOf('*/', i + 2);
+      const stop = end === -1 ? n : end + 2;
+      out += blank(source.slice(i, stop));
+      i = stop;
+    } else if (c === '"') {
+      const verbatim = source[i - 1] === '@' || (source[i - 1] === '$' && source[i - 2] === '@');
+      let j = i + 1;
+      while (j < n) {
+        if (verbatim) {
+          if (source[j] === '"' && source[j + 1] === '"') {
+            j += 2;
+            continue;
+          }
+          if (source[j] === '"') break;
+        } else {
+          if (source[j] === '\\') {
+            j += 2;
+            continue;
+          }
+          if (source[j] === '"' || source[j] === '\n') break;
+        }
+        j += 1;
+      }
+      const closed = j < n && source[j] === '"';
+      out += `"${blank(source.slice(i + 1, j))}${closed ? '"' : ''}`;
+      i = closed ? j + 1 : j;
+    } else if (c === "'") {
+      let j = i + 1;
+      while (j < n && source[j] !== "'" && source[j] !== '\n') {
+        j += source[j] === '\\' ? 2 : 1;
+      }
+      const closed = j < n && source[j] === "'";
+      out += `'${blank(source.slice(i + 1, j))}${closed ? "'" : ''}`;
+      i = closed ? j + 1 : j;
+    } else {
+      out += c;
+      i += 1;
+    }
+  }
+  return out;
+}
+
+// 1 始まりの行番号
+function lineOf(text, index) {
+  return text.slice(0, index).split('\n').length;
+}
+
+// open の { に対応する } までの中身（コードの部分）。対応が無ければ例外にして、検査が黙って通らないようにする
+function blockBody(code, open) {
+  let depth = 0;
+  for (let i = open; i < code.length; i += 1) {
+    if (code[i] === '{') depth += 1;
+    if (code[i] === '}') {
+      depth -= 1;
+      if (depth === 0) return code.slice(open + 1, i);
+    }
+  }
+  throw new Error(`対応する } が見つからない（${lineOf(code, open)} 行目）`);
+}
+
+// 握りつぶした catch（本文に throw も Debug.Log も無い）の行番号
+function findSwallowedCatches(source) {
+  const code = csharpCode(source);
+  const lines = [];
+  for (const match of code.matchAll(/\bcatch\b/g)) {
+    const open = code.indexOf('{', match.index);
+    if (open === -1) throw new Error(`catch の本文が無い（${lineOf(code, match.index)} 行目）`);
+    const body = blockBody(code, open);
+    if (!/\bthrow\b/.test(body) && !/\bDebug\.Log(?:Warning|Error|Exception)?\s*\(/.test(body)) {
+      lines.push(lineOf(code, match.index));
+    }
+  }
+  return lines;
+}
+
+// ?? の既定値（右辺が throw ではないもの）の行番号。?? throw（値が無ければ例外）は許す
+function findNullCoalescingDefaults(source) {
+  const code = csharpCode(source);
+  return [...code.matchAll(/\?\?=?(?!\s*throw\b)/g)].map((match) => lineOf(code, match.index));
+}
+
+// static の可変フィールドの行番号（static readonly と const は除く。メソッド・プロパティ・static クラスは対象外）
+function findMutableStaticFields(source) {
+  const code = csharpCode(source);
+  const pattern = /^[ \t]*(?:\[[^\]\n]*\][ \t]*)*(?:(?:public|private|internal|protected)[ \t]+)?static[ \t]+(?!readonly\b|const\b|class\b|struct\b|enum\b|interface\b)[^();{}=\n]+?[ \t]+[A-Za-z_]\w*[ \t]*(?:=[^;\n]*)?;/gm;
+  return [...code.matchAll(pattern)].map((match) => lineOf(code, match.index));
+}
+
+// 外部の JavaScript・ネイティブの呼び出し（ExternalEval・ExternalCall・DllImport・extern）の行番号（重複なし）
+function findExternalCalls(source) {
+  const code = csharpCode(source);
+  const lines = new Set([...code.matchAll(/\b(?:ExternalEval|ExternalCall|DllImport|extern)\b/g)]
+    .map((match) => lineOf(code, match.index)));
+  return [...lines].sort((a, b) => a - b);
+}
+
+// Assets 配下の C# 本文（Plugins と Resources を除く）に、検出器を当てて違反を集める
+function collectViolations(detector) {
+  const violations = [];
+  for (const file of unityCodeFiles()) {
+    for (const line of detector(readFileSync(file, 'utf8'))) {
+      violations.push(`${repoRel(file)}:${line}`);
+    }
+  }
+  return violations;
+}
+
+test('検出器は違反の例を見つけ、正しい書き方を見逃さない（自己確認）', () => {
+  const bad = [
+    'class A {',
+    '  static int counter = 0;',
+    '  static readonly int Max = 3;',
+    '  const string Name = "static int x;";',
+    '  // static int y;',
+    '  static void Run() { }',
+    '  void F() {',
+    '    try { G(); } catch (System.Exception e) { return; }',
+    '    var x = a ?? "";',
+    '    var y = a ?? throw new System.Exception();',
+    '    Application.ExternalEval("x");',
+    '  }',
+    '  [System.Runtime.InteropServices.DllImport("x")]',
+    '  static extern int N();',
+    '}',
+  ].join('\n');
+  assert.deepEqual(findMutableStaticFields(bad), [2], 'static の可変フィールドを行 2 で見つけるべき');
+  assert.deepEqual(findSwallowedCatches(bad), [8], '握りつぶした catch を行 8 で見つけるべき');
+  assert.deepEqual(findNullCoalescingDefaults(bad), [9], '?? の既定値を行 9 で見つけるべき');
+  assert.deepEqual(findExternalCalls(bad), [11, 13, 14], '外部の呼び出しを行 11・13・14 で見つけるべき');
+
+  const good = [
+    'try { G(); } catch (System.Exception e) { throw; }',
+    'try { G(); } catch (System.Exception e) { Debug.LogWarning("x"); return; }',
+    'var y = a ?? throw new System.Exception();',
+  ].join('\n');
+  assert.deepEqual(findSwallowedCatches(good), [], '再送出と記録のある catch は見逃さない');
+  assert.deepEqual(findNullCoalescingDefaults(good), [], '?? throw は既定値ではない');
+});
+
+test('例外は握りつぶさない（catch は throw するか、Debug.Log で記録する）', () => {
+  assert.deepEqual(collectViolations(findSwallowedCatches), [], '握りつぶした catch がある');
+});
+
+test('既定値の ?? を使わない（値が無いときは明示的に扱う。?? throw は許す）', () => {
+  assert.deepEqual(collectViolations(findNullCoalescingDefaults), [], '?? の既定値がある');
+});
+
+test('static の可変フィールドを持たない（static readonly と const だけ）', () => {
+  assert.deepEqual(collectViolations(findMutableStaticFields), [], 'static の可変フィールドがある');
+});
+
+test('ExternalEval・ExternalCall・DllImport・extern を使わない（外部の JavaScript とネイティブを呼ばない）', () => {
+  assert.deepEqual(collectViolations(findExternalCalls), [], '外部の呼び出しがある');
+});
+
+test('保存の有無は JSON の null だけを「保存なし」とし、想定外の型は型名をログに残して失敗にする', () => {
+  const source = csharpCode(read('src/unity/Assets/Scripts/Game/GameController.cs'));
+  assert.doesNotMatch(source, /hasSavedGame\s*=[^;]*==\s*JTokenType\.Object/, '保存の有無を型の等値比較だけで決めている');
+  assert.match(source, /JTokenType\.Null/, '保存なし（JSON の null）の判定が無い');
+  assert.match(source, /LogTexts\.FieldTypeUnexpected,\s*ApiConfig\.KeyGame,\s*\w+\.Type\)/, '想定外の型の名前をログに残していない');
+  assert.equal((source.match(/TryReadSavedGame\(/g) ?? []).length, 3, '起動と続きからが同じ判定を通っていない（定義 1 と呼び出し 2）');
+});
+
+test('ビルドの UNITY_EXE は既定値を持たず、未設定ならビルドを始めずに止まる', () => {
+  const script = read('src/unity/tools/build-webgl.sh');
+  assert.doesNotMatch(script, /\/mnt\/[a-z]\//, 'Windows 側の既定のパスが残っている');
+  assert.doesNotMatch(script, /^\s*UNITY_EXE=/m, 'UNITY_EXE に既定値を代入している');
+  assert.doesNotMatch(script, /UNITY_EXE[^\n]*既定/, 'UNITY_EXE の説明に既定値がある');
+  const guard = script.indexOf('-z "${UNITY_EXE:-}"');
+  const use = script.indexOf('-f "$UNITY_EXE"');
+  assert.ok(guard !== -1, 'UNITY_EXE が未設定のときの確認が無い');
+  assert.ok(use > guard, 'UNITY_EXE の確認が、場所を使う前に無い');
+  assert.match(script.slice(guard, use), /exit 1/, 'UNITY_EXE が未設定のときに終了していない');
+});
+
+test('README は UNITY_EXE を必須として説明し、WSL の内部パスを書かない', () => {
+  const readme = read('README.md');
+  assert.match(readme, /UNITY_EXE[^\n]*(必須|未設定)/, 'README に UNITY_EXE の設定方法（必須・未設定のとき）が無い');
+  assert.doesNotMatch(readme, /\/mnt\/[a-z]\//, 'README に WSL の内部パスがある');
+  assert.doesNotMatch(readme, /[A-Za-z]:\\/, 'README に Windows の絶対パスがある');
+});

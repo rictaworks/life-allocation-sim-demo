@@ -1,6 +1,8 @@
+using System;
 using LifeAllocationSim.Config;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using UnityEngine;
 
 namespace LifeAllocationSim.Api
 {
@@ -11,7 +13,7 @@ namespace LifeAllocationSim.Api
         {
             NetworkError = networkError;
             StatusCode = statusCode;
-            BodyText = bodyText ?? string.Empty;
+            BodyText = bodyText;
             RetryAfter = retryAfter;
         }
 
@@ -21,7 +23,7 @@ namespace LifeAllocationSim.Api
         /// <summary>HTTP の状態コード。応答が無いときは 0。</summary>
         public long StatusCode { get; }
 
-        /// <summary>応答の本文（JSON）。</summary>
+        /// <summary>応答の本文（JSON）。読めなかったときは null（空の文字列で代えない。読む側は null を明示的に扱う）。</summary>
         public string BodyText { get; }
 
         /// <summary>Retry-After の値（無ければ null）。</summary>
@@ -41,20 +43,39 @@ namespace LifeAllocationSim.Api
                     return null;
                 }
 
+                if (BodyText == null)
+                {
+                    Debug.LogWarning(LogTexts.ApiBodyMissing);
+                    return null;
+                }
+
                 try
                 {
                     var error = JObject.Parse(BodyText)[ApiConfig.KeyError] as JObject;
                     var code = error?[ApiConfig.KeyCode];
                     return code != null && code.Type == JTokenType.String ? code.Value<string>() : null;
                 }
-                catch (JsonException)
+                catch (JsonException exception)
                 {
+                    // 本文の中身はログに出さない（型名だけを残す）
+                    Debug.LogWarning(string.Format(LogTexts.ApiErrorBodyUnreadable, exception.GetType().Name));
                     return null;
                 }
             }
         }
 
-        /// <summary>本文を JSON のオブジェクトとして読む。形が違えば JsonException。</summary>
-        public JObject ParseBody() => JObject.Parse(BodyText);
+        /// <summary>
+        /// 本文を JSON のオブジェクトとして読む。形が違えば JsonException。本文が無ければ FormatException。
+        /// どちらも呼び出し側で失敗として扱う（null を成功と見なさない）。
+        /// </summary>
+        public JObject ParseBody()
+        {
+            if (BodyText == null)
+            {
+                throw new FormatException(LogTexts.ApiBodyMissing);
+            }
+
+            return JObject.Parse(BodyText);
+        }
     }
 }
