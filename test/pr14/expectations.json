@@ -1,0 +1,148 @@
+{
+  "pullRequest": 14,
+  "baseRef": "origin/main",
+  "ownDir": "test/pr14",
+  "nestedRunGuardEnv": "PR14_CHECK_NESTED",
+  "timeoutsMs": {
+    "git": 30000,
+    "gh": 60000,
+    "dotnetTest": 600000,
+    "acceptanceTest": 900000,
+    "dotnetBuild": 300000,
+    "playwrightList": 120000
+  },
+  "childEnv": {
+    "git": { "GIT_OPTIONAL_LOCKS": "0" },
+    "gh": { "GH_PROMPT_DISABLED": "1", "GH_NO_UPDATE_NOTIFIER": "1", "NO_COLOR": "1" },
+    "dotnet": {
+      "DOTNET_CLI_UI_LANGUAGE": "en",
+      "DOTNET_NOLOGO": "1",
+      "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+      "MSBUILDDISABLENODEREUSE": "1"
+    }
+  },
+  "coreTests": {
+    "project": "src/core/DomainCore.Tests",
+    "namePrefix": "DomainCore.Tests.",
+    "expectedTotal": 171,
+    "classesByCriterion": [
+      { "criterion": "1（Allocation と ValidateAllocation）", "classes": ["AllocationValidationTests", "ValidationResultTests"] },
+      { "criterion": "2（AllocationAdjuster）", "classes": ["AllocationAdjusterTests"] },
+      { "criterion": "3（SeededRandom）", "classes": ["SeededRandomTests"] },
+      { "criterion": "4（マスタ定数）", "classes": ["MasterDataTests"] },
+      { "criterion": "8（難易度コードの検証）", "classes": ["DifficultyValidationTests"] }
+    ],
+    "ruleTests": [
+      {
+        "criterion": "3（System.Random などの非決定的な API を使わない：IL の検査）",
+        "tests": [
+          "DomainCore.Tests.AssemblyRulesTests.DomainCoreDoesNotUseNonDeterministicApis",
+          "DomainCore.Tests.AssemblyRulesTests.InspectorDetectsSystemRandom"
+        ]
+      },
+      {
+        "criterion": "5（Config 以外の .cs に文字列リテラルを書かない：ソースを読んで検査するテスト）",
+        "tests": [
+          "DomainCore.Tests.SourceRulesTests.NoStringOrCharLiteralsOutsideConfig",
+          "DomainCore.Tests.SourceRulesTests.ConfigHoldsStringLiterals",
+          "DomainCore.Tests.SourceRulesTests.FindsDomainCoreSourcesInsideAndOutsideConfig"
+        ]
+      },
+      {
+        "criterion": "6（float・double・decimal を使わない：ソースと IL の検査、金額は long・万分率は int）",
+        "tests": [
+          "DomainCore.Tests.SourceRulesTests.NoFloatingPointTypesOrLiteralsInDomainCore",
+          "DomainCore.Tests.AssemblyRulesTests.DomainCoreDoesNotUseFloatingPointTypes",
+          "DomainCore.Tests.AssemblyRulesTests.MoneyIsLongYenAndRatesAreIntBasisPointsOrPercent"
+        ]
+      },
+      {
+        "criterion": "7（Config の各ファイルの先頭の注記）",
+        "tests": ["DomainCore.Tests.SourceRulesTests.EveryConfigFileStartsWithModelValueNotice"]
+      }
+    ],
+    "literalRuleTestSource": {
+      "file": "src/core/DomainCore.Tests/SourceRulesTests.cs",
+      "mustContain": [
+        "public void NoStringOrCharLiteralsOutsideConfig()",
+        "Where(file => !file.IsConfig)",
+        "CSharpTokenKind.StringLiteral",
+        "CSharpTokenKind.CharLiteral",
+        "Assert.Empty(violations)"
+      ]
+    }
+  },
+  "acceptanceTests": {
+    "project": "test/pr14/DomainCore.AcceptanceTests",
+    "namePrefix": "DomainCore.AcceptanceTests.",
+    "expectedTotal": 113,
+    "classes": [
+      { "criterion": "1", "class": "Criterion1AllocationValidationTests", "expected": 16 },
+      { "criterion": "2", "class": "Criterion2AllocationAdjusterTests", "expected": 25 },
+      { "criterion": "3", "class": "Criterion3SeededRandomTests", "expected": 20 },
+      { "criterion": "4", "class": "Criterion4MasterDataTests", "expected": 33 },
+      { "criterion": "6", "class": "Criterion6NumericTypesTests", "expected": 2 },
+      { "criterion": "8", "class": "Criterion8DifficultyCodeTests", "expected": 17 }
+    ]
+  },
+  "releaseBuild": {
+    "project": "src/core/DomainCore",
+    "configuration": "Release",
+    "expectedWarnings": 0,
+    "expectedErrors": 0,
+    "outputDll": "src/core/DomainCore/bin/Release/netstandard2.1/DomainCore.dll"
+  },
+  "sources": {
+    "domainCoreDir": "src/core/DomainCore",
+    "configDirName": "Config",
+    "excludedTopLevelDirNames": ["bin", "obj"],
+    "expectedConfigFiles": [
+      "DifficultyTable.cs",
+      "ErrorMessages.cs",
+      "GameRules.cs",
+      "LifeEventTable.cs",
+      "LifeStageTable.cs",
+      "RankTable.cs",
+      "ReasonTexts.cs"
+    ],
+    "configNoticePrefix": "//",
+    "configNoticeMarkers": ["数値", "すべて", "架空のモデル値"],
+    "floatingPointNames": ["float", "double", "decimal", "Single", "Double", "Decimal", "MathF", "Half"],
+    "randomTypeName": "Random",
+    "randomQualifiedName": "System.Random",
+    "masterTableFiles": ["DifficultyTable.cs", "LifeEventTable.cs"]
+  },
+  "editScope": {
+    "newFilePrefixes": ["src/core/DomainCore/", "src/core/DomainCore.Tests/"],
+    "otherLayersRoot": "src/",
+    "ruleOwnerPrefix": "src/core/"
+  },
+  "ci": {
+    "workflowName": "CI",
+    "requiredJobs": ["core", "backend"],
+    "pollIntervalMs": 20000,
+    "waitLimitMs": 1200000
+  },
+  "e2e": {
+    "dir": "test",
+    "playwrightPackage": "@playwright/test",
+    "playwrightBin": "playwright"
+  },
+  "ownFiles": {
+    "cases": [
+      { "path": "test/pr14/DomainCore.AcceptanceTests/bin/Debug/net8.0/DomainCore.AcceptanceTests.dll", "ignored": true },
+      { "path": "test/pr14/DomainCore.AcceptanceTests/obj/project.assets.json", "ignored": true },
+      { "path": "test/pr14/DomainCore.AcceptanceTests/DomainCore.AcceptanceTests.csproj", "ignored": false },
+      { "path": "test/pr14/DomainCore.AcceptanceTests/Criterion1AllocationValidationTests.cs", "ignored": false },
+      { "path": "test/pr14/DomainCore.AcceptanceTests/Support/MoveHistory.cs", "ignored": false },
+      { "path": "test/pr14/acceptance.check.mjs", "ignored": false },
+      { "path": "test/pr14/expectations.json", "ignored": false },
+      { "path": "test/pr14/splitmix64-vectors.json", "ignored": false },
+      { "path": "test/pr14/.gitignore", "ignored": false }
+    ]
+  },
+  "splitMix64": {
+    "vectorsFile": "test/pr14/splitmix64-vectors.json",
+    "canonicalSeedZero": ["0xE220A8397B1DCDAF", "0x6E789E6AA1B965F4", "0x06C45D188009454F", "0xF88BB8A8724C81EC", "0x1B39896A51A8749B"]
+  }
+}

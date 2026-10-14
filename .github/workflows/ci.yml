@@ -1,3 +1,5 @@
+# CI。pull_request と main への push で、core（.NET）・backend（Rails）・web（Playwright）を検査する。
+# Unity 本体のビルドは CI に入れない（静的検査は web ジョブで Node の標準テストとして実行する）。理由は README.md の「CI」の節に書いている。
 name: CI
 
 on:
@@ -19,27 +21,26 @@ jobs:
         with:
           persist-credentials: false
       - uses: actions/setup-dotnet@v6
-        id: setup-dotnet
         with:
-          dotnet-version: '8.0.x'
-      # ランナーには新しい SDK も入っているため、setup-dotnet が入れた .NET 8 の SDK に固定する（setup-dotnet の README の手順）
-      - name: .NET 8 の SDK に固定する
-        env:
-          DOTNET_SDK_VERSION: ${{ steps.setup-dotnet.outputs.dotnet-version }}
-        run: |
-          test -n "$DOTNET_SDK_VERSION"
-          printf '{"sdk":{"version":"%s"}}\n' "$DOTNET_SDK_VERSION" > global.json
+          dotnet-version: '10.0.x'
+      - name: .NET の版を表示する
+        run: dotnet --version
       - name: Domain Core のテスト
-        run: |
-          dotnet --version
-          dotnet test src/core/DomainCore.Tests
+        run: dotnet test src/core/DomainCore.Tests
+      - name: 再計算ホストのテスト
+        run: dotnet test src/core-host/CoreHost.Tests
+      - name: 再計算ホストのビルド（Release）
+        run: dotnet build src/core-host/CoreHost -c Release
 
   backend:
     name: backend
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
       RAILS_ENV: test
+      APP_ORIGIN: https://www.example.com
+      DATABASE_PATH: ${{ github.workspace }}/src/backend/tmp/test.sqlite3
+      CORE_HOST_DLL: ${{ github.workspace }}/src/core-host/CoreHost/bin/Release/net10.0/CoreHost.dll
     defaults:
       run:
         working-directory: src/backend
@@ -47,12 +48,52 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - name: 再計算ホストのビルド（Release）
+        run: dotnet build "${GITHUB_WORKSPACE}/src/core-host/CoreHost" -c Release
       - uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '3.4'
+          ruby-version: '3.4.11'
           bundler-cache: true
           working-directory: src/backend
-      - name: テスト用 DB の準備
-        run: bin/rails db:prepare
-      - name: RSpec
+      # 起動時の検査が SECRET_KEY_BASE を求めるため、実行のたびに作って環境変数に入れる。ファイルには書かない。
+      - name: テスト用の SECRET_KEY_BASE を作る（保存しない）
+        run: echo "SECRET_KEY_BASE=$(openssl rand -hex 64)" >> "$GITHUB_ENV"
+      - name: Rubocop
+        run: bin/rubocop
+      - name: Brakeman
+        run: bin/brakeman --no-pager
+      - name: bundler-audit（Gem の既知の脆弱性。脆弱性の DB を更新してから検査する）
+        run: bin/bundler-audit check --update
+      - name: RSpec（統合テストは再計算ホストを呼ぶ）
         run: bundle exec rspec
+
+  web:
+    name: web
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: test
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: test/package-lock.json
+      - name: Unity の静的検査（Node の標準テスト。Unity 本体は動かさない）
+        working-directory: .
+        run: node --test src/unity/tests/static-checks.test.mjs
+      - name: テストの依存関係を入れる
+        run: npm ci
+      - name: Chromium（ヘッドレス）を入れる
+        run: npx playwright install --with-deps chromium-headless-shell
+      - name: Web のテスト（Playwright）
+        run: npx playwright test web
+      - name: HTML の検査（html-validate）
+        run: npm run validate:html

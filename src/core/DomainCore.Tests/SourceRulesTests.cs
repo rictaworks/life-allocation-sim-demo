@@ -77,7 +77,7 @@ namespace DomainCore.Tests
         private static bool IsFloatingPointName(string identifier) =>
             identifier == "float" || identifier == "double" || identifier == "decimal"
             || identifier == "Single" || identifier == "Double" || identifier == "Decimal"
-            || identifier == "MathF";
+            || identifier == "MathF" || identifier == "Half";
 
         private static List<string> Violations(IEnumerable<SourceFile> files, Func<CSharpToken, bool> isViolation) =>
             files

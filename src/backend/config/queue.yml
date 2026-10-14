@@ -5,7 +5,8 @@ default: &default
   workers:
     - queues: "*"
       threads: 3
-      processes: <%= ENV.fetch("JOB_CONCURRENCY", 1) %>
+      # この設定は Solid Queue を使うときだけ読まれる（Gemfile に無いため、現在は読まれない）。環境変数では上書きしない。
+      processes: 1
       polling_interval: 1
 
 development:

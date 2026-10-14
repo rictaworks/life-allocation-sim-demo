@@ -1,0 +1,31 @@
+# 保存 API の設定値。文字列と数値はここに置き、コードには直接書かない。
+# 既定値で補う設定は無い（読めなければ例外になる）。
+shared:
+  session:
+    cookie_name: "__Host-lasd_session"
+    ttl_days: 7
+    token_bytes: 32
+  client_ip:
+    header: "X-Real-IP"
+  request:
+    body_limit_bytes: 8192
+    json_media_type: "application/json"
+    json_charset: "utf-8"
+  request_digest:
+    key_salt: "request_events.scope_digest"
+  rate_limits:
+    session_issue:
+      - { window_seconds: 60, limit: 10 }
+    # ゲームの開始は再計算ホストを呼ぶ重い操作のため、保存と同じ頻度で数える。
+    game_start:
+      - { window_seconds: 1, limit: 1 }
+      - { window_seconds: 60, limit: 20 }
+    # 保存（201）と、保存済みの番号の再送（200）は、この同じ枠で数える（再送もホストを呼ぶため）。
+    turn_save:
+      - { window_seconds: 1, limit: 1 }
+      - { window_seconds: 60, limit: 20 }
+    # 現在のゲームの取得（GET /api/game）は、ゲームがあるときに再計算ホストを呼ぶ。同時実行の枠を占有させないため、
+    # 有効なセッションごとに数える（保存・開始の枠とは別に数える）。
+    game_read:
+      - { window_seconds: 1, limit: 2 }
+      - { window_seconds: 60, limit: 60 }

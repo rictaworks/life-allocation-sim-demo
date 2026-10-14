@@ -3,12 +3,13 @@
 
 # This Dockerfile is designed for production, not development. Use with Kamal or build'n'run by hand:
 # docker build -t backend .
-# docker run -d -p 80:80 -e RAILS_MASTER_KEY=<value from config/master.key> --name backend backend
+# docker run -d -p 80:80 -e SECRET_KEY_BASE=<64+ chars> -e DATABASE_PATH=/rails/storage/app.sqlite3 -e APP_ORIGIN=<https://origin> --name backend backend
+# （値は環境変数で渡す。起動時の検査で不足があれば起動しない。）
 
 # For a containerized dev environment, see Dev Containers: https://guides.rubyonrails.org/getting_started_with_devcontainer.html
 
 # Make sure RUBY_VERSION matches the Ruby version in .ruby-version
-ARG RUBY_VERSION=3.4.10
+ARG RUBY_VERSION=3.4.11
 FROM docker.io/library/ruby:$RUBY_VERSION-slim AS base
 
 # Rails app lives here

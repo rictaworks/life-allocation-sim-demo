@@ -16,5 +16,9 @@ namespace DomainCore.Config
         public const string DifficultyMissing = "難易度が指定されていません。";
 
         public const string DifficultyUnknown = "指定された難易度はありません。一覧から選んでください。";
+
+        public const string ReplayInvalidAllocation = "配分が正しくないため、ターンを進められません。";
+
+        public const string ReplayGameFinished = "このゲームはすでに終了しているため、ターンを追加できません。";
     }
 }

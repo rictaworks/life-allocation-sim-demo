@@ -32,6 +32,15 @@ namespace DomainCore.Tests
         }
 
         [Fact]
+        public void EveryReplayViolationHasText()
+        {
+            foreach (ReplayViolation violation in Enum.GetValues(typeof(ReplayViolation)))
+            {
+                AssertPoliteSentence(ReasonDescriptions.Describe(violation));
+            }
+        }
+
+        [Fact]
         public void AllocationTextsShowTheRuleNumbers()
         {
             Assert.Contains(GameRules.AllocationStepPct.ToString(CultureInfo.InvariantCulture), ReasonDescriptions.Describe(AllocationViolation.StepMismatch));
@@ -58,10 +67,12 @@ namespace DomainCore.Tests
         [Fact]
         public void ConfigSentencesArePolite()
         {
-            var sentences = new[] { typeof(ReasonTexts), typeof(ErrorMessages) }
+            // 文を持つ文字列（。で終わる）だけを調べる。書式（#,##0 など）は対象外
+            var sentences = new[] { typeof(ReasonTexts), typeof(ErrorMessages), typeof(EvaluationTexts) }
                 .SelectMany(type => type.GetFields(BindingFlags.Public | BindingFlags.Static))
                 .Where(field => field.IsLiteral && field.FieldType == typeof(string))
                 .Select(field => (string)field.GetRawConstantValue()!)
+                .Where(text => text.Contains("。"))
                 .ToArray();
 
             Assert.NotEmpty(sentences);
@@ -75,7 +86,9 @@ namespace DomainCore.Tests
                 text.EndsWith("ます。", StringComparison.Ordinal)
                 || text.EndsWith("ません。", StringComparison.Ordinal)
                 || text.EndsWith("です。", StringComparison.Ordinal)
-                || text.EndsWith("ください。", StringComparison.Ordinal),
+                || text.EndsWith("ください。", StringComparison.Ordinal)
+                || text.EndsWith("ました。", StringComparison.Ordinal)
+                || text.EndsWith("でした。", StringComparison.Ordinal),
                 $"ですます調の文になっていません: {text}");
         }
     }

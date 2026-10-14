@@ -40,6 +40,7 @@ namespace DomainCore.Tests
         [InlineData(nameof(FloatingPointSamples.CastsThroughDouble))]
         [InlineData(nameof(FloatingPointSamples.MultipliesByDecimal))]
         [InlineData(nameof(FloatingPointSamples.KeepsDoubleLocal))]
+        [InlineData(nameof(FloatingPointSamples.ConvertsToHalf))]
         public void InspectorDetectsFloatingPointUsage(string methodName)
         {
             var findings = TypeUsageInspector.FindInMethod(SampleMethod(methodName), IsFloatingPoint, FloatingPointOpCodes());
@@ -130,7 +131,8 @@ namespace DomainCore.Tests
             Assert.All(percents, member => Assert.Equal(typeof(int), member.Type));
         }
 
-        private static bool IsFloatingPoint(Type type) => type == typeof(float) || type == typeof(double) || type == typeof(decimal);
+        private static bool IsFloatingPoint(Type type) =>
+            type == typeof(float) || type == typeof(double) || type == typeof(decimal) || type == typeof(Half);
 
         private static bool IsNonDeterministicApi(Type type) =>
             type == typeof(Random) || type == typeof(DateTime) || type == typeof(DateTimeOffset)
@@ -168,6 +170,9 @@ namespace DomainCore.Tests
             double half = value / 2.0;
             return (int)half;
         }
+
+        // System.Half は浮動小数点の型（float・double・decimal と同じく使わない）
+        public static int ConvertsToHalf(int value) => (int)(Half)value;
 
         public static int UsesSystemRandom(int seed) => new Random(seed).Next();
 

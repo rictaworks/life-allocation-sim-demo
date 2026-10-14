@@ -39,6 +39,20 @@ namespace DomainCore
             }
         }
 
+        /// <summary>再計算が受け付けない理由の文章。未定義の理由コードは ArgumentOutOfRangeException。</summary>
+        public static string Describe(ReplayViolation violation)
+        {
+            switch (violation)
+            {
+                case ReplayViolation.InvalidAllocation:
+                    return ReasonTexts.ReplayInvalidAllocation;
+                case ReplayViolation.GameFinished:
+                    return ReasonTexts.ReplayGameFinished;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(violation), violation, ErrorMessages.UndefinedReason);
+            }
+        }
+
         private static string Format(string format, int value) => string.Format(CultureInfo.InvariantCulture, format, value);
     }
 }

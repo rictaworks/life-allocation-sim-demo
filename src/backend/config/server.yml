@@ -1,0 +1,16 @@
+# サーバーの設定値（Puma のスレッド数と待ち受けポート、SQLite の接続数、本番のログの水準）。
+# 既定値はこのファイルに明示する（コードの中では補わない。config/server_settings.rb が読む）。
+# 環境変数が設定されているときだけ、その値で上書きする。上書きに使う環境変数は、項目の横に書く。
+# 上書きの値の形（整数など）は、読む側（Puma・Rails）が起動時に検査する。
+shared:
+  puma:
+    # スレッド数。上書き：RAILS_MAX_THREADS（SQLite の接続数も同じ値で上書きする）。
+    max_threads: 3
+    # 待ち受けのポート。上書き：PORT（ホスティングが指定するポートを使うため）。
+    port: 3000
+  database:
+    # SQLite の接続数の上限。上書き：RAILS_MAX_THREADS。
+    max_connections: 5
+  log:
+    # 本番のログの水準。上書き：RAILS_LOG_LEVEL。
+    level: "info"

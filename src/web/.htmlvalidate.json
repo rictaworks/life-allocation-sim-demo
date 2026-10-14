@@ -1,0 +1,4 @@
+{
+  "$schema": "https://html-validate.org/schema/config.json",
+  "extends": ["html-validate:recommended"]
+}

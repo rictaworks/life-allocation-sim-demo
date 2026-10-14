@@ -1,3 +1,6 @@
+using System;
+using DomainCore.Config;
+
 namespace DomainCore
 {
     /// <summary>
@@ -25,5 +28,19 @@ namespace DomainCore
 
         /// <summary>必要生活費の基準（円/年）。物価係数を掛ける前の値（requirements.md 3.3）。</summary>
         public long BaseLivingCostYen { get; }
+
+        /// <summary>年齢に対応するライフステージを返す。どの段階にも入らない年齢は ArgumentOutOfRangeException。</summary>
+        public static LifeStage ForAge(int age)
+        {
+            foreach (var stage in LifeStageTable.All)
+            {
+                if (stage.MinAge <= age && age <= stage.MaxAge)
+                {
+                    return stage;
+                }
+            }
+
+            throw new ArgumentOutOfRangeException(nameof(age), age, ErrorMessages.LifeStageNotFound);
+        }
     }
 }

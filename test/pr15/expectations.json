@@ -1,0 +1,127 @@
+{
+  "_comment": "PR 15 のユーザーテストの期待値（テストの正）。文言は実装側（src/web/index.html・src/web/js/config.js・src/web/legal.html・config/locales/ja.yml・src/unity/Assets/Scripts/Config/UiTexts.cs）と一致させる。テストのコードには文言や URL を書かず、ここから読む。",
+  "baseUrl": "http://localhost:8080",
+  "precondition": "開発用サーバー（http://localhost:8080）と Rails（localhost:3000）の両方が起動している必要があります。README の「ローカルでの起動」の手順 1〜3 で起動してください。",
+  "artifactsDir": "../../WORK/inspect/pr15-artifacts",
+  "viewports": {
+    "desktop": { "width": 1280, "height": 800 },
+    "mobile": { "width": 375, "height": 667 }
+  },
+  "layout": {
+    "gutterPx": 16,
+    "tolerancePx": 1
+  },
+  "timeouts": {
+    "testMs": 120000,
+    "unityTestMs": 300000,
+    "unityStartMs": 240000,
+    "expectMs": 10000,
+    "devServerSpawnMs": 15000,
+    "rateLimitWaitMs": 1100
+  },
+  "devServer": {
+    "path": "src/web/dev-server.mjs",
+    "refusedText": "開発用サーバーは APP_ENV が development のときだけ起動します。起動を取りやめました。"
+  },
+  "page": {
+    "title": "人生配分シミュレーション（デモ版）",
+    "lang": "ja",
+    "h1": "人生配分シミュレーション",
+    "skipLinkText": "本文へ移動",
+    "navLabel": "主要",
+    "footerLabel": "フッター",
+    "navHomeText": "人生配分シミュレーション",
+    "navBackText": "← デモ一覧へ",
+    "navBackHref": "https://rictaworks.jp/#demos",
+    "banner": "これはデモ版です。データはサーバー再起動時にリセットされる場合があります。",
+    "bannerBackgroundRgb": [255, 191, 0],
+    "minimumContrastRatio": 4.5,
+    "notice": "利回り・イベント・物価は、すべて架空のモデル値です。",
+    "consultText": "ご相談はこちら",
+    "consultHref": "https://rictaworks.jp/",
+    "footerLinks": [
+      { "text": "利用規約", "href": "/legal#terms", "target": "#terms" },
+      { "text": "免責事項", "href": "/legal#disclaimer", "target": "#disclaimer" },
+      { "text": "連絡先", "href": "/legal#contact", "target": "#contact" }
+    ]
+  },
+  "legal": {
+    "path": "/legal",
+    "title": "利用規約・免責事項・連絡先（人生配分シミュレーション）",
+    "h1": "利用規約・免責事項・連絡先",
+    "sectionIds": ["terms", "disclaimer", "data", "contact"],
+    "mustContain": [
+      "利回り・イベント・物価は、すべて架空のモデル値です。",
+      "このサイトは教育目的のデモです。投資の助言ではありません。",
+      "氏名・生年月日・メールアドレス・住所・電話番号などの個人情報は入力しないでください。",
+      "毎日 JST 03:00 に、このサイトのすべてのデータを削除します。",
+      "この Cookie は 7 日間有効です。"
+    ],
+    "contactEmail": "info@rictaworks.jp"
+  },
+  "consent": {
+    "storageKey": "life-allocation-sim.analytics-consent",
+    "grantedValue": "granted",
+    "deniedValue": "denied",
+    "bannerTitle": "アクセス解析の利用について",
+    "grantedLabel": "許可",
+    "deniedLabel": "拒否",
+    "reopenLabel": "アクセス解析の設定を変更",
+    "measurementId": "G-C04W1XKS16",
+    "gtmPrefix": "https://www.googletagmanager.com/",
+    "readFailedText": "同意の選択を読み込めませんでした。同意バナーを表示します。",
+    "saveFailedText": "同意の選択を保存できませんでした。この表示の間だけ有効です。"
+  },
+  "unity": {
+    "loaderPath": "unity/Build/LifeAllocationSim.loader.js",
+    "buildFiles": [
+      "unity/Build/LifeAllocationSim.loader.js",
+      "unity/Build/LifeAllocationSim.framework.js",
+      "unity/Build/LifeAllocationSim.data",
+      "unity/Build/LifeAllocationSim.wasm"
+    ],
+    "loadingFragment": "シミュレーションを読み込んでいます",
+    "minBrightPixelFraction": 0.5,
+    "missingBuildText": "シミュレーションの表示データが見つからないため、表示できません。Unity のビルドを配置すると、ここに表示されます。",
+    "resetNoticeText": "データがリセットされました。新しく始めてください。",
+    "uiTextsPath": "../../src/unity/Assets/Scripts/Config/UiTexts.cs"
+  },
+  "api": {
+    "cookieName": "__Host-lasd_session",
+    "cookieMaxAgeSeconds": 604800,
+    "cookieTokenPattern": "^[A-Za-z0-9_-]{43}$",
+    "prefix": "/api/",
+    "maxSeed": "9223372036854775807",
+    "maxBodyBytes": 8192,
+    "foreignOrigin": "https://evil.example",
+    "difficulties": {
+      "start": "normal",
+      "restart": "easy",
+      "unknown": "impossible"
+    },
+    "paths": {
+      "session": "/api/session",
+      "game": "/api/game",
+      "games": "/api/games",
+      "turns": "/api/games/turns",
+      "unknown": "/api/nothing"
+    },
+    "errors": {
+      "bad_request": { "status": 400, "message": "リクエストの内容が正しくありません。" },
+      "session_required": { "status": 401, "message": "セッションが確認できません。ページを開き直してから、もう一度お試しください。" },
+      "origin_forbidden": { "status": 403, "message": "この操作は許可されていません。" },
+      "not_found": { "status": 404, "message": "お探しの内容は見つかりません。" },
+      "game_not_found": { "status": 404, "message": "ゲームが見つかりません。ゲームを始めてから、もう一度お試しください。" },
+      "payload_too_large": { "status": 413, "message": "送信の内容が大きすぎます。" },
+      "unsupported_media_type": { "status": 415, "message": "送信の形式が正しくありません。JSON で送信してください。" },
+      "difficulty_missing": { "status": 422, "message": "難易度を選んでください。" },
+      "difficulty_unknown": { "status": 422, "message": "選択された難易度は見つかりません。一覧から選び直してください。" },
+      "allocation_negative": { "status": 422, "message": "配分に負の値は指定できません。" },
+      "allocation_step_mismatch": { "status": 422, "message": "配分は決められた刻み幅で指定してください。" },
+      "allocation_sum_mismatch": { "status": 422, "message": "配分の合計が正しくありません。配分を入れ直してください。" },
+      "turn_conflict": { "status": 409, "message": "この年の番号が正しくありません。画面を読み込み直してから、もう一度お試しください。" },
+      "turn_allocation_mismatch": { "status": 409, "message": "この年の配分は、すでに別の内容で記録されています。画面を読み込み直して、ご確認ください。" },
+      "rate_limited": { "status": 429, "message": "操作が多すぎます。しばらく待ってから、もう一度お試しください。" }
+    }
+  }
+}
