@@ -227,7 +227,7 @@ Domain Core を Release でビルドし、`bin/Release/netstandard2.1/DomainCore
 node --test src/unity/tests/static-checks.test.mjs
 ```
 
-Unity の自動テストは作っていません。規則は Domain Core のテストで検査し、Unity 側は、数値の直書きや禁止した API を使っていないかを静的に検査します。あわせて、例外の握りつぶし、`??` の既定値、static の可変フィールド、外部の JavaScript・ネイティブの呼び出し（ExternalEval・DllImport など）を検査します。
+Unity の自動テストは作っていません。規則は Domain Core のテストで検査し、Unity 側は、数値の直書きや禁止した API を使っていないかを静的に検査します。あわせて、例外の握りつぶし、`??` の既定値、null の判定で既定値を入れる三項演算子（`== null ? 既定値` など）、static の可変フィールド、外部の JavaScript・ネイティブの呼び出し（ExternalEval・DllImport など）を検査します。
 
 ### 確認の範囲
 

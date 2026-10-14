@@ -459,6 +459,78 @@ function findExternalCalls(source) {
   return [...lines].sort((a, b) => a - b);
 }
 
+// ? が三項演算子の記号か（?. ・?[ ・?? の一部は除く）
+function isTernaryQuestion(code, index) {
+  const prev = code[index - 1];
+  const next = code[index + 1];
+  return code[index] === '?' && next !== '?' && next !== '.' && next !== '[' && prev !== '?';
+}
+
+// 三項演算子の ? の位置から、真の枝と偽の枝の本文を返す。対応する : が無ければ例外にして、検査が黙って通らないようにする。
+// 真の枝は ; と閉じ括弧で止まる。偽の枝は、それに加えて , でも止まる（型の引数の , を枝の終わりと誤認しないため）。
+function splitTernary(code, question) {
+  let depth = 0;
+  let nested = 0;
+  let colon = -1;
+  let end = code.length;
+  for (let j = question + 1; j < code.length; j += 1) {
+    const c = code[j];
+    if (c === '(' || c === '[' || c === '{') {
+      depth += 1;
+    } else if (c === ')' || c === ']' || c === '}') {
+      if (depth === 0) {
+        end = j;
+        break;
+      }
+      depth -= 1;
+    } else if (depth === 0 && c === ';') {
+      end = j;
+      break;
+    } else if (depth === 0 && c === ',' && colon !== -1) {
+      end = j;
+      break;
+    } else if (depth === 0 && colon === -1 && isTernaryQuestion(code, j)) {
+      nested += 1;
+    } else if (depth === 0 && colon === -1 && c === ':' && code[j - 1] !== ':' && code[j + 1] !== ':') {
+      if (nested === 0) {
+        colon = j;
+      } else {
+        nested -= 1;
+      }
+    }
+  }
+
+  if (colon === -1) {
+    throw new Error(`三項演算子の : が見つからない（${lineOf(code, question)} 行目）`);
+  }
+
+  return {
+    whenTrue: code.slice(question + 1, colon).trim(),
+    whenFalse: code.slice(colon + 1, end).trim(),
+  };
+}
+
+// null の判定（== null・is null・IsNullOrEmpty・IsNullOrWhiteSpace、およびその否定）を条件にした三項演算子のうち、
+// 値が null のときの枝が null でも throw でもないもの（既定値を入れているもの）の行番号。null を返す枝と throw する枝は許す。
+function findNullDefaultTernaries(source) {
+  const code = csharpCode(source);
+  const nullTest = /(?:==\s*null|\bis\s+null|\bIsNull(?:OrEmpty|OrWhiteSpace)\s*\((?:[^()]|\([^()]*\))*\))\s*$/;
+  const notNullTest = /(?:!=\s*null|\bis\s+not\s+null|!\s*(?:string\.)?IsNull(?:OrEmpty|OrWhiteSpace)\s*\((?:[^()]|\([^()]*\))*\))\s*$/;
+  const lines = [];
+  for (let i = 0; i < code.length; i += 1) {
+    if (!isTernaryQuestion(code, i)) continue;
+    const before = code.slice(Math.max(0, i - 200), i);
+    const negated = notNullTest.test(before);
+    if (!negated && !nullTest.test(before)) continue;
+    const { whenTrue, whenFalse } = splitTernary(code, i);
+    const nullBranch = negated ? whenFalse : whenTrue;
+    if (nullBranch !== 'null' && !/^throw\b/.test(nullBranch)) {
+      lines.push(lineOf(code, i));
+    }
+  }
+  return lines;
+}
+
 // Assets 配下の C# 本文（Plugins と Resources を除く）に、検出器を当てて違反を集める
 function collectViolations(detector) {
   const violations = [];
@@ -508,6 +580,44 @@ test('例外は握りつぶさない（catch は throw するか、Debug.Log で
 
 test('既定値の ?? を使わない（値が無いときは明示的に扱う。?? throw は許す）', () => {
   assert.deepEqual(collectViolations(findNullCoalescingDefaults), [], '?? の既定値がある');
+});
+
+test('null の判定で既定値を入れる三項演算子の検出器は、違反の例を見つけ、正しい書き方を見逃さない（自己確認）', () => {
+  const bad = [
+    'class A {',
+    '  string F(D d, C c, string x, bool flag) {',
+    '    var t = d == null ? string.Empty : d.text;',
+    '    var n = c == null ? 0 : c.Value;',
+    '    var s = d != null ? d.text : "";',
+    '    var u = string.IsNullOrEmpty(x) ? "x" : x;',
+    '    var v = !string.IsNullOrEmpty(x) ? x : "y";',
+    '    var w = d == null',
+    '      ? string.Empty',
+    '      : d.text;',
+    '    var r = d != null ? d.text : flag ? "a" : "b";',
+    '    return w + r;',
+    '  }',
+    '}',
+  ].join('\n');
+  assert.deepEqual(findNullDefaultTernaries(bad), [3, 4, 5, 6, 7, 9, 11], '既定値を入れる三項演算子を行 3・4・5・6・7・9・11 で見つけるべき');
+  assert.throws(() => findNullDefaultTernaries('var a = d == null ? 1;'), /三項演算子の :/, '対応する : が無いときは黙って通さず例外にする');
+
+  const good = [
+    'var a = d == null ? null : d.text;',
+    'var b = d == null ? throw new System.Exception() : d.text;',
+    'var c = d != null ? d.text : null;',
+    'var e = flag ? "a" : "b";',
+    'var f = d?.text;',
+    'var g = d?.Child ?? throw new System.Exception();',
+    'int? h = null;',
+    'var k = a == null || b == null ? null : c;',
+    'var z = "d == null ? 1 : 2"; // d == null ? 3 : 4',
+  ].join('\n');
+  assert.deepEqual(findNullDefaultTernaries(good), [], 'null と throw の枝、null の判定ではない三項演算子、文字列とコメントの中は違反にしない');
+});
+
+test('null の判定で既定値を入れない（== null ? 既定値・!= null ? 値 : 既定値 を使わない。null と throw は許す）', () => {
+  assert.deepEqual(collectViolations(findNullDefaultTernaries), [], 'null の判定で既定値を入れる三項演算子がある');
 });
 
 test('static の可変フィールドを持たない（static readonly と const だけ）', () => {

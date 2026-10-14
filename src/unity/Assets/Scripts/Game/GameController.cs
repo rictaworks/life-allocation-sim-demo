@@ -260,10 +260,15 @@ namespace LifeAllocationSim.Game
             // code が無い（本文を読めない・code の項目が無い）ときは null のまま扱う。null はどの code にも一致しないので、
             // 状態コードによる文言（429・503）か、最後の汎用の文言になる。空の文字列で代えて一致させることはしない
             var code = response.ErrorCode;
-            Debug.LogWarning(string.Format(
-                LogTexts.ApiErrorResponse,
-                response.StatusCode,
-                code == null ? LogTexts.ErrorCodeMissing : code));
+            if (code == null)
+            {
+                Debug.LogWarning(string.Format(LogTexts.ApiErrorResponseWithoutCode, response.StatusCode));
+            }
+            else
+            {
+                Debug.LogWarning(string.Format(LogTexts.ApiErrorResponse, response.StatusCode, code));
+            }
+
             // 404 と、ゲームの途中で session が無くなった 401 は、データがリセットされたものとして新規開始へ誘導する
             if (code == ApiConfig.ErrorGameNotFound || (inGame && code == ApiConfig.ErrorSessionRequired))
             {

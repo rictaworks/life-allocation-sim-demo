@@ -8,7 +8,7 @@ namespace LifeAllocationSim.Config
     {
         public const string ApiNetworkFailure = "保存 API に接続できませんでした。";
         public const string ApiErrorResponse = "保存 API がエラーを返しました。状態：{0}、code：{1}";
-        public const string ErrorCodeMissing = "（code なし）";
+        public const string ApiErrorResponseWithoutCode = "保存 API がエラーを返しました。状態：{0}、code：なし";
         public const string ApiUnexpectedBody = "保存 API の応答を解釈できませんでした。状態：{0}";
         public const string ApiBodyMissing = "保存 API の応答の本文がありません。";
         public const string ApiErrorBodyUnreadable = "保存 API のエラーの本文を読めませんでした。例外の種類：{0}";

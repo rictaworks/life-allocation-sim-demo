@@ -74,7 +74,8 @@ namespace LifeAllocationSim.Api
 
                 var networkError = request.result == UnityWebRequest.Result.ConnectionError
                     || request.result == UnityWebRequest.Result.DataProcessingError;
-                var text = request.downloadHandler == null ? string.Empty : request.downloadHandler.text;
+                // 本文が読めなかったときは null のまま渡す（空の文字列で代えない。読む側が null を失敗として扱う：ApiResponse）
+                var text = request.downloadHandler.text;
                 var response = new ApiResponse(
                     networkError,
                     request.responseCode,
