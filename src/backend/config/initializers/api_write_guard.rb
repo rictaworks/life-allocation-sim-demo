@@ -21,7 +21,7 @@ class ApiWriteGuard
   private
 
   def same_origin?(request)
-    request.get_header("HTTP_ORIGIN") == AppSettings.origin
+    request.get_header(ApiSettings.origin_env_key) == AppSettings.origin
   end
 
   # Rack が本体を解析する media type（form・multipart・parseable）は、どのメソッドでも拒否する。

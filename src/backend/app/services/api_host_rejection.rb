@@ -4,8 +4,8 @@
 class ApiHostRejection
   def self.call(env)
     # 値は引用符で囲んでから出す（改行などを含む値でも、ログの 1 行を壊さないため）。
-    blocked_hosts = Array(env["action_dispatch.blocked_hosts"]).map(&:inspect).join(", ")
-    Rails.logger.error("[api] blocked host: #{blocked_hosts}")
+    blocked_hosts = Array(env[ApiSettings.blocked_hosts_env_key]).map(&:inspect).join(", ")
+    Rails.logger.error(InternalMessages.text(:api, :blocked_host, hosts: blocked_hosts))
 
     # Host 用の code は無いため、origin_forbidden（403）を使う。
     ApiError.new(:origin_forbidden).to_rack_response

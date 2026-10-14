@@ -47,7 +47,7 @@ class TurnSaver
     # 保存済みの番号の再送の中身。配分が同じなら保存済みの TURN を返し、違えば 409。GAME は現在の履歴をホストで再計算して返す。
     def saved_result(game, saved, turn_request)
       turn = saved.find { |record| record.turn_no == turn_request.turn_no }
-      internal_failure!("saved turn is missing for a requested replay") if turn.nil?
+      internal_failure!(:saved_turn_missing) if turn.nil?
       raise ApiError.new(:turn_allocation_mismatch) unless turn.same_allocation?(turn_request.allocation)
 
       Result.new(turn: TurnPayload.from_record(turn), game: GameSnapshot.call(game), created: false)
@@ -64,7 +64,7 @@ class TurnSaver
       last = turns.last
       return last if turns.size == turn_no && last.fetch("turn_no") == turn_no
 
-      internal_failure!("replay result does not match the requested turn")
+      internal_failure!(:replay_mismatch)
     end
 
     def created_result(game, replayed, host_turn)
@@ -112,8 +112,8 @@ class TurnSaver
     end
 
     # 内部の不整合。ログには操作の名前と結果だけを出し、応答は内部エラーにする（詳細は出さない）。
-    def internal_failure!(message)
-      Rails.logger.error("[turn] #{message}")
+    def internal_failure!(key)
+      Rails.logger.error(InternalMessages.text(:turn, key))
       raise ApiError.new(:internal_error)
     end
   end

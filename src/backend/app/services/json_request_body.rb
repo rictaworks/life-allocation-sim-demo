@@ -29,7 +29,7 @@ class JsonRequestBody
     # 申告された Content-Length と、実際に読んだ長さの両方で上限を検査する。
     def read_within_limit!(request)
       limit = ApiSettings.body_limit_bytes
-      declared = request.get_header("CONTENT_LENGTH")
+      declared = request.get_header(ApiSettings.content_length_env_key)
       if declared
         length = Integer(declared, exception: false)
         raise ApiError.new(:bad_request) if length.nil? || length.negative?

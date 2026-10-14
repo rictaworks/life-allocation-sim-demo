@@ -26,13 +26,13 @@ class CoreHostProcess
         unless wait_thread.join(timeout)
           kill_group(pid)
           drain(writer, out_reader, err_reader)
-          raise TimedOut, "time limit exceeded"
+          raise TimedOut, InternalMessages.text(:core_host, :process_time_limit)
         end
 
         drain(writer, out_reader, err_reader)
         stdout_data = out_reader.value
         stderr_data = err_reader.value
-        raise Failure, "output limit exceeded" if stdout_data.bytesize > max_output_bytes || stderr_data.bytesize > max_stderr_bytes
+        raise Failure, InternalMessages.text(:core_host, :process_output_limit) if stdout_data.bytesize > max_output_bytes || stderr_data.bytesize > max_stderr_bytes
 
         Result.new(status: wait_thread.value.exitstatus, stdout: stdout_data, stderr: stderr_data)
       end

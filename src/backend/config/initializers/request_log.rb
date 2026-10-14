@@ -6,7 +6,7 @@ class ApiRequestLogger < Rails::Rack::Logger
   private
 
   def started_request_message(request)
-    sprintf('Started %s "%s" at %s', request.raw_request_method, request.filtered_path, Time.now)
+    InternalMessages.text(:request_log, :started, method: request.raw_request_method, path: request.filtered_path, time: Time.now)
   end
 end
 

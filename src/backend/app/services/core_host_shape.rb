@@ -74,7 +74,7 @@ module CoreHostShape
       when Hash
         verify_object(value, type, path)
       else
-        raise ArgumentError, "unknown shape type"
+        raise ArgumentError, InternalMessages.text(:core_host, :unknown_shape_type)
       end
     end
 

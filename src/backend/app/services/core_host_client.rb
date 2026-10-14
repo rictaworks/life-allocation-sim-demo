@@ -56,7 +56,7 @@ class CoreHostClient
     when CoreHostSettings.exit_code(:rule_violation)
       raise_rule_violation(checked(parse(result.stdout), :error))
     else
-      log_failure("#{command} exit status #{result.status.inspect}")
+      log_failure(:exit_status, command: command, status: result.status.inspect)
       raise ApiError.new(:internal_error)
     end
   end
@@ -64,7 +64,7 @@ class CoreHostClient
   def raise_rule_violation(response)
     code = response.fetch("error").fetch("code")
     unless CoreHostSettings.rule_violation_codes.include?(code)
-      log_failure("rule code is not mapped: #{code.truncate(40)}")
+      log_failure(:rule_code_unmapped, code: code.truncate(40))
       raise ApiError.new(:internal_error)
     end
 
@@ -75,21 +75,21 @@ class CoreHostClient
     CoreHostShape.check!(value, shape)
     value
   rescue CoreHostShape::Mismatch => error
-    log_failure("unexpected output shape at #{error.message}")
+    log_failure(:shape_mismatch, path: error.message)
     raise ApiError.new(:internal_error)
   end
 
   def parse(stdout)
     JSON.parse(stdout.to_s.dup.force_encoding(Encoding::UTF_8))
   rescue JSON::ParserError
-    log_failure("output is not JSON")
+    log_failure(:output_not_json)
     raise ApiError.new(:internal_error)
   end
 
   # 同時実行の枠を待つ（待ちは上限まで）。枠を得てから起動し、終わったら必ず枠を返す。
   def run_within_gate(argv, body)
     unless @gate.try_acquire(1, @wait_seconds)
-      log_failure("no slot within the wait limit")
+      log_failure(:no_slot)
       raise ApiError.new(:service_unavailable)
     end
 
@@ -103,10 +103,10 @@ class CoreHostClient
         max_stderr_bytes: CoreHostSettings.max_stderr_bytes
       )
     rescue CoreHostProcess::TimedOut
-      log_failure("timed out")
+      log_failure(:timed_out)
       raise ApiError.new(:service_unavailable)
     rescue CoreHostProcess::Failure
-      log_failure("process failed")
+      log_failure(:process_failed)
       raise ApiError.new(:internal_error)
     ensure
       @gate.release
@@ -117,7 +117,7 @@ class CoreHostClient
   def enforce_input_limit!(body)
     return if body.bytesize <= CoreHostSettings.max_input_bytes
 
-    log_failure("input exceeds the limit")
+    log_failure(:input_limit_exceeded)
     raise ApiError.new(:internal_error)
   end
 
@@ -126,7 +126,7 @@ class CoreHostClient
     value = ENV[CoreHostSettings.dll_env_key]
     return value if value.is_a?(String) && Pathname.new(value).absolute? && File.file?(value)
 
-    log_failure("dll is not available")
+    log_failure(:dll_unavailable)
     raise ApiError.new(:internal_error)
   end
 
@@ -139,7 +139,8 @@ class CoreHostClient
   end
 
   # ログには、入力の JSON・出力の値・標準エラーの内容・Cookie・セッション ID を出さない（操作の名前と結果だけ）。
-  def log_failure(message)
-    Rails.logger.error("[core_host] #{message}")
+  # 文言は config/messages.yml の core_host から読む。
+  def log_failure(key, **values)
+    Rails.logger.error(InternalMessages.text(:core_host, key, **values))
   end
 end

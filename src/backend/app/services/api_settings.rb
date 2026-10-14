@@ -35,6 +35,39 @@ module ApiSettings
       fetch(:request_digest, :key_salt)
     end
 
+    def session_status(name)
+      fetch(:response, :session_status, name)
+    end
+
+    def retry_after_header
+      fetch(:http, :retry_after_header)
+    end
+
+    def content_type_header
+      fetch(:http, :content_type_header)
+    end
+
+    # JSON の応答の Content-Type（例：application/json; charset=utf-8）。
+    def json_content_type
+      format(fetch(:http, :content_type_format), media_type: json_media_type, charset: json_charset)
+    end
+
+    def origin_env_key
+      fetch(:http, :origin_env_key)
+    end
+
+    def content_length_env_key
+      fetch(:http, :content_length_env_key)
+    end
+
+    def exception_env_key
+      fetch(:http, :exception_env_key)
+    end
+
+    def blocked_hosts_env_key
+      fetch(:http, :blocked_hosts_env_key)
+    end
+
     # 種類ごとの制限（期間と件数）。未定義の種類は例外になる。
     def rate_limit_rules(kind)
       fetch(:rate_limits, kind).map do |rule|

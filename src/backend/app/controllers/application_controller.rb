@@ -15,7 +15,7 @@ class ApplicationController < ActionController::API
   private
 
   def render_api_error(error)
-    response.headers["Retry-After"] = error.retry_after.to_s if error.retry_after
+    response.headers[ApiSettings.retry_after_header] = error.retry_after.to_s if error.retry_after
     render json: error.body, status: error.status
   end
 
@@ -24,7 +24,8 @@ class ApplicationController < ActionController::API
   end
 
   def render_unexpected_error(exception)
-    Rails.logger.error("[api] unexpected #{exception.class.name} in #{controller_path}##{action_name}")
+    Rails.logger.error(InternalMessages.text(:api, :unexpected_error, class_name: exception.class.name,
+                                                                      controller: controller_path, action: action_name))
     Rails.logger.error(Array(exception.backtrace).first(30).join("\n"))
     render_api_error(ApiError.new(:internal_error))
   end

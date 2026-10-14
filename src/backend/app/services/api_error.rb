@@ -26,7 +26,7 @@ class ApiError < StandardError
 
   # retry_after は 429 のときだけ使う（秒）。Retry-After ヘッダーに入る。
   def initialize(code, retry_after: nil)
-    raise ArgumentError, "unknown ApiError code: #{code.inspect}" unless STATUSES.key?(code)
+    raise ArgumentError, InternalMessages.text(:api, :unknown_error_code, code: code.inspect) unless STATUSES.key?(code)
 
     @code = code
     @retry_after = retry_after
@@ -43,8 +43,8 @@ class ApiError < StandardError
 
   # Rack の応答（ステータス・ヘッダー・本文）。コントローラの外（ミドルウェア・exceptions_app）でも、同じ形にそろえる。
   def to_rack_response
-    headers = { "Content-Type" => "#{ApiSettings.json_media_type}; charset=#{ApiSettings.json_charset}" }
-    headers["Retry-After"] = retry_after.to_s if retry_after
+    headers = { ApiSettings.content_type_header => ApiSettings.json_content_type }
+    headers[ApiSettings.retry_after_header] = retry_after.to_s if retry_after
     [ status, headers, [ JSON.generate(body) ] ]
   end
 end

@@ -10,7 +10,7 @@ class ApiExceptionsApp
 
   # 対応表にない例外は、内部エラー（500）として扱う。
   def self.call(env)
-    exception = env.fetch("action_dispatch.exception")
+    exception = env.fetch(ApiSettings.exception_env_key)
     status = ActionDispatch::ExceptionWrapper.status_code_for_exception(exception.class.name)
 
     ApiError.new(CODES_BY_STATUS.fetch(status, :internal_error)).to_rack_response
