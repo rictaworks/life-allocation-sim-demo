@@ -259,7 +259,7 @@ RSpec.describe CoreHostClient do
       expect(logs).not_to include("MARKER_OUTPUT")
     end
 
-    it "終了コードの失敗は、呼んだ種類（init）と終了コードだけを記録し、標準エラーの内容は記録しない" do
+    it "終了コードの失敗は、呼んだ種類（init）と終了コードを記録し、型名の形でない標準エラーは記録しない" do
       launcher.respond_with(host_result(status: 1, stderr: "STDERR_MARKER /internal/host/path"))
 
       logs = capture_logs do
@@ -271,15 +271,47 @@ RSpec.describe CoreHostClient do
       expect(logs).not_to include("/internal/host/path")
     end
 
-    it "replay の失敗も、呼んだ種類（replay）と終了コードだけを記録する（終了コードが無い場合も標準エラーは出さない）" do
-      launcher.respond_with(host_result(status: 1, stderr: "STDERR_MARKER"))
+    it "標準エラーが例外の型名だけなら、その型名を操作名と終了コードと一緒に記録する" do
+      launcher.respond_with(host_result(status: 1, stderr: "IOException\n"))
+
+      logs = capture_logs do
+        expect { client.init(difficulty: "normal") }.to raise_error(ApiError)
+      end
+
+      expect(logs).to include("[core_host] init exit status 1 error type IOException")
+    end
+
+    it "replay の失敗も、型名を操作名（replay）と一緒に記録する" do
+      launcher.respond_with(host_result(status: 1, stderr: "InvalidOperationException\n"))
+
+      logs = capture_logs do
+        expect { client.replay(seed: 1, difficulty: "normal", history: []) }.to raise_error(ApiError)
+      end
+
+      expect(logs).to include("[core_host] replay exit status 1 error type InvalidOperationException")
+    end
+
+    it "型名の形でない標準エラー（改行の後ろに続く文字を含むものなど）は、型名も含めて記録しない" do
+      launcher.respond_with(host_result(status: 1, stderr: "IOException\nSTDERR_LINE_MARKER"))
+
+      logs = capture_logs do
+        expect { client.init(difficulty: "normal") }.to raise_error(ApiError)
+      end
+
+      expect(logs).to include("[core_host] init exit status 1")
+      expect(logs).not_to include("IOException")
+      expect(logs).not_to include("STDERR_LINE_MARKER")
+    end
+
+    it "replay の失敗も、呼んだ種類（replay）と終了コードを記録し、型名の形でない標準エラーは記録しない（終了コードが無い場合も同じ）" do
+      launcher.respond_with(host_result(status: 1, stderr: "STDERR_MARKER /internal/host/path"))
       logs = capture_logs do
         expect { client.replay(seed: 1, difficulty: "normal", history: []) }.to raise_error(ApiError)
       end
       expect(logs).to include("[core_host] replay exit status 1")
       expect(logs).not_to include("STDERR_MARKER")
 
-      launcher.respond_with(host_result(status: nil, stderr: "STDERR_MARKER"))
+      launcher.respond_with(host_result(status: nil, stderr: "STDERR_MARKER /internal/host/path"))
       logs = capture_logs do
         expect { client.replay(seed: 1, difficulty: "normal", history: []) }.to raise_error(ApiError)
       end

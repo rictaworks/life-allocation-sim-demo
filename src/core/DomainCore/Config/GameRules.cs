@@ -49,6 +49,9 @@ namespace DomainCore.Config
         /// <summary>貯蓄の固定金利（万分率。年率）。元本保証・低金利（requirements.md 3.3）。</summary>
         public const int SavingsInterestBp = 10;
 
+        /// <summary>市場の振れ幅の端の数（平均の上と下の 2 つ）。振れ幅 V のとき、年間のリターンは平均の −V から +V までの、両端を含む 2V+1 通りの一様な値になる。</summary>
+        public const int VolatilityEndpointCount = 2;
+
         /// <summary>物価係数の 1 年あたりの上げ幅（万分率）。わずかに上げる（requirements.md 4.3-7）。</summary>
         public const int InflationBp = 100;
 
@@ -63,6 +66,9 @@ namespace DomainCore.Config
 
         /// <summary>評価の生活の質で「ふつう」とみなす平均満足度の下限。これ未満は「低め」。</summary>
         public const int QualityMiddleMinSatisfaction = 40;
+
+        /// <summary>自動調整（AllocationAdjuster）で、残り 2 本の合計が 0 のときに使う重み。2 本を同じ重みにして、均等に分ける。</summary>
+        public const int AdjusterEqualWeight = 1;
 
         /// <summary>
         /// 自動調整（AllocationAdjuster）で、まだ動かしていない項目の順序（動かした時期が古い順）。

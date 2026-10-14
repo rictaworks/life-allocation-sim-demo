@@ -8,6 +8,9 @@ class CoreHostClient
   # 同時実行の枠。読み込み時に 1 つだけ作り、すべての呼び出しで共有する（遅延の初期化は競合するため使わない）。
   SHARED_GATE = Concurrent::Semaphore.new(CoreHostSettings.max_concurrent)
 
+  # 標準エラーに出る例外の型名の形（英字・下線で始まる英数字と下線）。ホストは型名だけを出す（Protocol.md）。この形に当たらないものは記録しない。
+  ERROR_TYPE_NAME = /\A[A-Za-z_][A-Za-z0-9_]{0,127}\z/
+
   class << self
     def init(difficulty:)
       new.init(difficulty: difficulty)
@@ -48,7 +51,7 @@ class CoreHostClient
   end
 
   # 終了コード：0 は成功（形を検査して返す）、2 は理由コード付きの規則違反、ほかは内部エラー。
-  # 内部エラーのログは、呼んだ種類と終了コードだけ（標準エラーの内容は記録しない）。
+  # 内部エラーのログは、呼んだ種類・終了コード・標準エラーの型名（型名の形のものだけ）。
   def interpret(result, command, shape)
     case result.status
     when CoreHostSettings.exit_code(:success)
@@ -56,9 +59,28 @@ class CoreHostClient
     when CoreHostSettings.exit_code(:rule_violation)
       raise_rule_violation(checked(parse(result.stdout), :error))
     else
-      log_failure(:exit_status, command: command, status: result.status.inspect)
+      log_exit_failure(command, result)
       raise ApiError.new(:internal_error)
     end
+  end
+
+  # 内部エラーの記録。標準エラーに型名の形のものがあれば、操作名・終了コードと一緒に残す。型名の形でなければ残さない。
+  def log_exit_failure(command, result)
+    error_type = error_type_of(result.stderr)
+    if error_type
+      log_failure(:exit_status_error_type, command: command, status: result.status.inspect, error_type: error_type)
+    else
+      log_failure(:exit_status, command: command, status: result.status.inspect)
+    end
+  end
+
+  # 標準エラーの内容を、型名の形（ERROR_TYPE_NAME）に当たるときだけ返す。当たらなければ nil。
+  # 標準エラーは子プロセスの出力なので、バイト列のまま見る（不正な UTF-8 でも例外にしない）。
+  def error_type_of(stderr)
+    name = stderr.b.strip
+    return nil unless name.match?(ERROR_TYPE_NAME)
+
+    name.force_encoding(Encoding::UTF_8)
   end
 
   def raise_rule_violation(response)
@@ -138,7 +160,7 @@ class CoreHostClient
     inherited.merge(CoreHostSettings.child_env)
   end
 
-  # ログには、入力の JSON・出力の値・標準エラーの内容・Cookie・セッション ID を出さない（操作の名前と結果だけ）。
+  # ログには、入力の JSON・出力の値・標準エラーの型名以外の内容・Cookie・セッション ID を出さない（操作の名前・結果・型名だけ）。
   # 文言は config/messages.yml の core_host から読む。
   def log_failure(key, **values)
     Rails.logger.error(InternalMessages.text(:core_host, key, **values))

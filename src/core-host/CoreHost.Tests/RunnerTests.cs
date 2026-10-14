@@ -62,6 +62,17 @@ namespace CoreHost.Tests
         }
 
         [Fact]
+        public void InitRejectsANullDifficultyAsMissing()
+        {
+            // null は未指定（difficulty_missing）。既定値に置き換えず、そのまま拒否する
+            var (exit, text) = Run(ProtocolNames.InitCommand, "{\"difficulty\":null}");
+
+            Assert.Equal(ProtocolLimits.ExitRuleViolation, exit);
+            Assert.Equal(ProtocolCodes.DifficultyMissing, ErrorOf(text).GetProperty(ProtocolNames.ErrorCode).GetString());
+            Assert.False(ErrorOf(text).TryGetProperty(ProtocolNames.TurnNo, out _));
+        }
+
+        [Fact]
         public void ReplayReturnsTurnsAndStateForAPartialHistory()
         {
             var body = ReplayJson(42, (60, 20, 20), (70, 20, 10));
@@ -354,9 +365,9 @@ namespace CoreHost.Tests
         }
 
         [Fact]
-        public void StandardInputThatCannotBeOpenedWritesNothingToStandardError()
+        public void StandardInputThatCannotBeOpenedWritesOnlyTheExceptionTypeToStandardError()
         {
-            // 例外の詳細は、標準エラーにも出さない（Protocol.md）。標準エラーを捕捉して、空であることを確かめる
+            // 内部エラーは、例外の型名だけを標準エラーに出す（Protocol.md）。メッセージは出さない。応答は書けないので、標準出力は空
             using var output = new MemoryStream();
 
             var (exit, error) = CaptureStandardError(() =>
@@ -364,11 +375,12 @@ namespace CoreHost.Tests
 
             Assert.Equal(ProtocolLimits.ExitInternalError, exit);
             Assert.Empty(output.ToArray());
-            Assert.Empty(error);
+            Assert.Equal(TypeNameLine(nameof(IOException)), error);
+            Assert.DoesNotContain("標準入力を開けません", error);
         }
 
         [Fact]
-        public void StandardOutputThatCannotBeOpenedWritesNothingToStandardError()
+        public void StandardOutputThatCannotBeOpenedWritesOnlyTheExceptionTypeToStandardError()
         {
             using var input = new MemoryStream(Encoding.UTF8.GetBytes($"{{\"{ProtocolNames.Difficulty}\":\"{Code}\"}}"));
 
@@ -376,34 +388,39 @@ namespace CoreHost.Tests
                 CoreHostRunner.RunOnConsole(new[] { ProtocolNames.InitCommand }, () => input, () => throw new IOException("標準出力を開けません")));
 
             Assert.Equal(ProtocolLimits.ExitInternalError, exit);
-            Assert.Empty(error);
+            Assert.Equal(TypeNameLine(nameof(IOException)), error);
+            Assert.DoesNotContain("標準出力を開けません", error);
         }
 
         [Fact]
-        public void InternalErrorWritesNothingToStandardError()
+        public void InternalErrorWritesOnlyTheExceptionTypeToStandardError()
         {
+            // 読み取りの例外は、型名だけを 1 行で出す（メッセージ・入力値・スタックトレースは出さない）
             using var output = new MemoryStream();
 
             var (exit, error) = CaptureStandardError(() => CoreHostRunner.Run(new[] { ProtocolNames.InitCommand }, new FailingInput(), output));
 
             Assert.Equal(ProtocolLimits.ExitInternalError, exit);
-            Assert.Empty(error);
+            Assert.Equal(TypeNameLine(nameof(IOException)), error);
+            Assert.DoesNotContain("読み取りに失敗しました", error);
         }
 
         [Fact]
-        public void UnwritableResponseWritesNothingToStandardError()
+        public void UnwritableResponseWritesOnlyTheExceptionTypeToStandardError()
         {
             using var input = new MemoryStream(Encoding.UTF8.GetBytes($"{{\"{ProtocolNames.Difficulty}\":\"{Code}\"}}"));
 
             var (exit, error) = CaptureStandardError(() => CoreHostRunner.Run(new[] { ProtocolNames.InitCommand }, input, new FailingOutput()));
 
             Assert.Equal(ProtocolLimits.ExitInternalError, exit);
-            Assert.Empty(error);
+            Assert.Equal(TypeNameLine(nameof(IOException)), error);
+            Assert.DoesNotContain("書き込みに失敗しました", error);
         }
 
         [Fact]
         public void RuleViolationWritesNothingToStandardError()
         {
+            // 規則違反は内部エラーではない。理由は応答の JSON で返すので、標準エラーには何も出さない
             using var input = new MemoryStream(Encoding.UTF8.GetBytes("{\"difficulty\":\"unknown-code\"}"));
             using var output = new MemoryStream();
 
@@ -411,6 +428,28 @@ namespace CoreHost.Tests
 
             Assert.Equal(ProtocolLimits.ExitRuleViolation, exit);
             Assert.Empty(error);
+        }
+
+        [Fact]
+        public void InternalErrorFollowedByAnUnwritableResponseWritesOnlyTheFirstExceptionTypeToStandardError()
+        {
+            // 読み取りの例外のあとに、内部エラーの応答も書けないときも、標準エラーには最初の例外の型名だけを 1 行で出す（2 行にしない）
+            var (exit, error) = CaptureStandardError(() => CoreHostRunner.Run(new[] { ProtocolNames.InitCommand }, new FailingInput(), new FailingOutput()));
+
+            Assert.Equal(ProtocolLimits.ExitInternalError, exit);
+            Assert.Equal(TypeNameLine(nameof(IOException)), error);
+        }
+
+        [Fact]
+        public void RuleViolationThatCannotBeWrittenWritesOnlyTheExceptionTypeToStandardError()
+        {
+            // 規則違反の応答が書けないときは内部エラー（終了コード 1）になるので、書けなかった例外の型名を標準エラーに出す
+            using var input = new MemoryStream(Encoding.UTF8.GetBytes("{\"difficulty\":\"unknown-code\"}"));
+
+            var (exit, error) = CaptureStandardError(() => CoreHostRunner.Run(new[] { ProtocolNames.InitCommand }, input, new FailingOutput()));
+
+            Assert.Equal(ProtocolLimits.ExitInternalError, exit);
+            Assert.Equal(TypeNameLine(nameof(IOException)), error);
         }
 
         [Fact]
@@ -485,6 +524,9 @@ namespace CoreHost.Tests
                 Console.SetError(original);
             }
         }
+
+        /// <summary>標準エラーに出るはずの 1 行（型名と改行）。</summary>
+        private static string TypeNameLine(string typeName) => typeName + Environment.NewLine;
 
         private static JsonElement ErrorOf(string text)
         {

@@ -72,8 +72,9 @@ namespace CoreHost
 
         private static GameStart StartFrom(JsonElement root)
         {
-            // 未指定（項目がない・null）も、不明なコードも、Domain Core の検証の結果をそのまま返す。空文字列は未指定として扱われる
-            var start = NewGame.Start(RequestReader.ReadDifficultyCode(root) ?? string.Empty);
+            // 項目がない・null は未指定として、ここで拒否する（既定値の空文字列に置き換えない）。空文字列とコードの検査は Domain Core が行う
+            var code = RequestReader.ReadDifficultyCode(root) ?? throw RejectionOf(DifficultyCodeViolation.Missing);
+            var start = NewGame.Start(code);
             if (!start.IsValid)
             {
                 throw RejectionOf(start.Reason);

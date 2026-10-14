@@ -35,7 +35,7 @@ namespace DomainCore
         /// <summary>難易度の平均と振れ幅から、年間のリターン（万分率）を一様に決める。振れ幅の両端を含む。乱数は 1 回。</summary>
         internal static int DrawReturnBp(Difficulty difficulty, SeededRandom random)
         {
-            var spread = random.NextInt((2 * difficulty.VolatilityBp) + 1);
+            var spread = random.NextInt((GameRules.VolatilityEndpointCount * difficulty.VolatilityBp) + 1);
             return difficulty.MeanReturnBp + spread - difficulty.VolatilityBp;
         }
 

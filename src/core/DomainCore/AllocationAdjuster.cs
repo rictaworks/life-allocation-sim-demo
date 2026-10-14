@@ -24,9 +24,6 @@ namespace DomainCore
     /// </summary>
     public sealed class AllocationAdjuster
     {
-        // 残り 2 本の合計が 0 のときに使う重み。2 本を同じ重みにして、均等に分ける
-        private const int EqualWeight = 1;
-
         // 3 項目を、動かした時期が古い順に並べたもの
         private readonly AllocationItem[] leastRecentFirst;
 
@@ -72,8 +69,8 @@ namespace DomainCore
         {
             if (keptWeight + absorberWeight == 0)
             {
-                keptWeight = EqualWeight;
-                absorberWeight = EqualWeight;
+                keptWeight = GameRules.AdjusterEqualWeight;
+                absorberWeight = GameRules.AdjusterEqualWeight;
             }
 
             var step = GameRules.AllocationStepPct;

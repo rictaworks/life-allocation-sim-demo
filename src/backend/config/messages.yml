@@ -11,6 +11,7 @@ shared:
     replay_mismatch: "[turn] replay result does not match the requested turn"
   core_host:
     exit_status: "[core_host] %{command} exit status %{status}"
+    exit_status_error_type: "[core_host] %{command} exit status %{status} error type %{error_type}"
     rule_code_unmapped: "[core_host] rule code is not mapped: %{code}"
     shape_mismatch: "[core_host] unexpected output shape at %{path}"
     output_not_json: "[core_host] output is not JSON"

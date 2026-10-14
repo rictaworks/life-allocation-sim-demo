@@ -19,14 +19,6 @@ namespace DomainCore
     /// </summary>
     public sealed class SeededRandom
     {
-        // SplitMix64 の定数。アルゴリズムで決まる値で、変えると同じシードから別の列になる（ゲームの調整用の値ではない）
-        private const ulong GoldenGamma = 0x9E3779B97F4A7C15UL;
-        private const ulong FirstMultiplier = 0xBF58476D1CE4E5B9UL;
-        private const ulong SecondMultiplier = 0x94D049BB133111EBUL;
-        private const int FirstShift = 30;
-        private const int SecondShift = 27;
-        private const int FinalShift = 31;
-
         private ulong state;
 
         /// <summary>シードから乱数列を作る。負のシードは、2 の補数のビット列をそのまま状態にする。</summary>
@@ -40,11 +32,11 @@ namespace DomainCore
         {
             unchecked
             {
-                state += GoldenGamma;
+                state += SplitMix64Constants.GoldenGamma;
                 var z = state;
-                z = (z ^ (z >> FirstShift)) * FirstMultiplier;
-                z = (z ^ (z >> SecondShift)) * SecondMultiplier;
-                return z ^ (z >> FinalShift);
+                z = (z ^ (z >> SplitMix64Constants.FirstShift)) * SplitMix64Constants.FirstMultiplier;
+                z = (z ^ (z >> SplitMix64Constants.SecondShift)) * SplitMix64Constants.SecondMultiplier;
+                return z ^ (z >> SplitMix64Constants.FinalShift);
             }
         }
 

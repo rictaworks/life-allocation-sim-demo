@@ -25,6 +25,10 @@ namespace DomainCore.Tests
         private const string BasisPointSuffix = "Bp";
         private const string PercentSuffix = "Pct";
 
+        // コンパイラが無名関数の呼び出しを速くするために作る置き場（<>c の <>9__ で始まる static フィールド）
+        private const string LambdaCacheTypeName = "<>c";
+        private const string LambdaCacheFieldPrefix = "<>9__";
+
         private static Assembly DomainCoreAssembly => typeof(Allocation).Assembly;
 
         [Fact]
@@ -76,12 +80,45 @@ namespace DomainCore.Tests
         [Fact]
         public void DomainCoreHasNoMutableStaticState()
         {
+            var findings = MutableStaticFindings(DomainCoreAssembly.GetTypes());
+
+            Assert.Empty(findings);
+        }
+
+        [Fact]
+        public void GeneratedTypesAreNotExemptFromTheStaticStateRule()
+        {
+            // コンパイラが生成した型の印があっても、書き換えられる static フィールドは見つける（型の印だけでは除外しない）
+            var findings = MutableStaticFindings(new[] { typeof(GeneratedStaticSamples) });
+
+            Assert.Contains(findings, finding => finding.Contains(nameof(GeneratedStaticSamples.Counter), StringComparison.Ordinal));
+        }
+
+        [Fact]
+        public void LambdaCacheFieldsAreExemptedByName()
+        {
+            // 無名関数の置き場は、コンパイラが実際に作ったものを使う。見本が置き場を作ったことを確かめてから、除外されることを見る
+            var cacheType = typeof(LambdaCacheSamples).GetNestedType(LambdaCacheTypeName, BindingFlags.NonPublic)
+                ?? throw new InvalidOperationException($"見本の無名関数の置き場がありません: {LambdaCacheTypeName}");
+            Assert.Contains(
+                cacheType.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static),
+                field => field.Name.StartsWith(LambdaCacheFieldPrefix, StringComparison.Ordinal));
+
+            Assert.Empty(MutableStaticFindings(new[] { cacheType }));
+        }
+
+        /// <summary>
+        /// 書き換えられる static フィールドと、中身を書き換えられるコレクションの static フィールドを列挙する。
+        /// コンパイラが生成した型も、印（CompilerGenerated）だけでは除かない。除くのは、無名関数の置き場（IsLambdaCacheField）だけ。
+        /// </summary>
+        private static List<string> MutableStaticFindings(IEnumerable<Type> types)
+        {
             var findings = new List<string>();
-            foreach (var type in DomainCoreAssembly.GetTypes().Where(type => !type.IsDefined(typeof(CompilerGeneratedAttribute), false)))
+            foreach (var type in types)
             {
                 foreach (var field in type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.DeclaredOnly))
                 {
-                    if (field.IsLiteral)
+                    if (field.IsLiteral || IsLambdaCacheField(type, field))
                     {
                         continue;
                     }
@@ -97,8 +134,15 @@ namespace DomainCore.Tests
                 }
             }
 
-            Assert.Empty(findings);
+            return findings;
         }
+
+        /// <summary>
+        /// 無名関数の置き場（コンパイラが生成した <>c の <>9__ フィールド）だけを、名前で除く。利用者の書いた static と、ほかの生成された static は検査する。
+        /// 置き場は、同じ無名関数を 2 回目以降に使うための参照で、ゲームの状態ではない。
+        /// </summary>
+        private static bool IsLambdaCacheField(Type type, FieldInfo field) =>
+            type.Name == LambdaCacheTypeName && field.Name.StartsWith(LambdaCacheFieldPrefix, StringComparison.Ordinal);
 
         [Fact]
         public void DomainCoreReferencesOnlyNetStandard()
@@ -177,5 +221,22 @@ namespace DomainCore.Tests
         public static int UsesSystemRandom(int seed) => new Random(seed).Next();
 
         public static long UsesIntegersOnly(long value) => (value * 3) + 1;
+    }
+
+    /// <summary>
+    /// コンパイラが生成した型の印を付けた見本（書き換えられる static を、型の印があっても見つけることの確認）。
+    /// </summary>
+    [CompilerGenerated]
+    public static class GeneratedStaticSamples
+    {
+        public static int Counter;
+    }
+
+    /// <summary>
+    /// 無名関数の見本。コンパイラが呼び出しを速くするための置き場（<>c の <>9__ フィールド）を作らせる。
+    /// </summary>
+    public static class LambdaCacheSamples
+    {
+        public static Func<int, int> Increment() => value => value + 1;
     }
 }

@@ -1,7 +1,7 @@
 namespace DomainCore
 {
     /// <summary>
-    /// ライフイベントの効果。年次精算（#3）は、イベントのコードではなく、この効果で処理を決める。
+    /// ライフイベントの効果。年次精算（YearSettlement）は、イベントのコードではなく、この効果で処理を決める。
     /// </summary>
     public enum LifeEventEffect
     {

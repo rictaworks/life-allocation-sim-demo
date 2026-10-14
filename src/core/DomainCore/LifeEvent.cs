@@ -5,7 +5,7 @@ namespace DomainCore
 {
     /// <summary>
     /// ライフイベントの定義（requirements.md 3.2・4.2・10 章のクラス図）。値は Config の LifeEventTable にある架空のモデル値。
-    /// 区分（出費系・収入系・市場系）は効果から決める。抽選と適用（drawEvent・advanceYear）は #3 で作る。
+    /// 区分（出費系・収入系・市場系）は効果から決める。抽選は EventDrawer、適用は YearSettlement が行う。
     /// </summary>
     public sealed class LifeEvent
     {

@@ -5,7 +5,7 @@ namespace DomainCore
 {
     /// <summary>
     /// 入力の検証（requirements.md 4.1・10 章のクラス図の Simulator）。副作用の無い純粋関数だけを持つ。
-    /// 年次精算（イベントの抽選・advanceYear）は #3、評価と履歴の再現は #4 で作る。
+    /// 年次精算は YearSettlement（イベントの抽選は EventDrawer）、評価は Evaluator、配分履歴からの再現は Replayer が担う。
     /// </summary>
     public static class Simulator
     {

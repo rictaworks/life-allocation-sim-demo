@@ -2,7 +2,7 @@ namespace DomainCore
 {
     /// <summary>
     /// 評価ランク（requirements.md 3.2・4.4）。Config の RankTable に上位から順に並ぶ。
-    /// 値は架空のモデル値。ランクを決める処理（evaluate）は #4 で作る。
+    /// 値は架空のモデル値。ランクを決める処理は Evaluator が行う。
     /// </summary>
     public sealed class Rank
     {
