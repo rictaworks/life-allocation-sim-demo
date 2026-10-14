@@ -53,7 +53,7 @@
 
 - `seed`：0 以上 2^63−1 以下の整数です。Rails が生成して保存します。負の値・小数など整数でない値は `request_invalid` です。
 - `difficulty`：`init` と同じです。
-- `history`：配分の配列です（先頭が 1 年目）。各要素は整数の `living_pct`（生活費の %）・`saving_pct`（貯蓄の %）・`invest_pct`（投資の %）です。整数は 32 ビット符号付き整数（int32）の範囲で読みます。範囲を超える値は、整数でない値と同じく `request_invalid` で拒否します。値の範囲・刻み・合計は Domain Core が確かめます。
+- `history`：配分の配列です（先頭が 1 年目）。各要素は整数の `living_pct`（生活費の %）・`saving_pct`（貯蓄の %）・`invest_pct`（投資の %）です。整数は、桁数に上限を置かずに読みます（int32 に限りません）。小数・指数表記・文字列・真偽値・null など整数でない値は `request_invalid` で拒否します。値の範囲・刻み・合計は Domain Core が確かめます。32 ビットの範囲の外の値（大きな整数と負の大きな値を含む）も、規則に従って理由コード（`allocation_negative`・`allocation_step_mismatch`・`allocation_sum_mismatch`）で拒否します（終了コード 2）。
 - 応答：`{"turns": [TURN...], "state": HOST_STATE, "evaluation": HOST_EVALUATION または null}`
   - 完走（65 歳）か破綻で終わっていれば `evaluation` があります。プレイ中なら null です。
   - 途中の不正な配分は、そのターンの `turn_no` と理由コードで拒否します（終了コード 2）。

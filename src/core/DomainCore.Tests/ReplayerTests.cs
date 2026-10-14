@@ -1,5 +1,7 @@
 using System;
+using System.Globalization;
 using System.Linq;
+using System.Numerics;
 using DomainCore.Config;
 using DomainCore.Tests.Support;
 using Xunit;
@@ -136,6 +138,37 @@ namespace DomainCore.Tests
             Assert.Equal(GameRules.StartAge, outcome.FinalState.Age);
             Assert.False(outcome.IsFinished);
         }
+
+        [Fact]
+        public void RawHistoryWithAValueOutsideInt32ReportsItsTurnAndReason()
+        {
+            var history = new[] { new AllocationInput(60, 20, 20), InputOf("4294967296", "0", "0") };
+
+            var result = Replayer.Replay(Normal, 7, history);
+
+            Assert.False(result.IsValid);
+            Assert.Equal(2, result.Failure.TurnNo);
+            Assert.Equal(ReplayViolation.InvalidAllocation, result.Failure.Violation);
+            Assert.Equal(AllocationViolation.StepMismatch, result.Failure.AllocationReason);
+        }
+
+        [Fact]
+        public void RawHistoryOfValidValuesGivesTheSameResultAsAllocations()
+        {
+            var raw = Mixed.Select(allocation => (AllocationInput)allocation).ToArray();
+
+            var fromRaw = Replayer.Replay(Normal, 42, raw).Outcome;
+            var fromAllocations = Replayer.Replay(Normal, 42, Mixed).Outcome;
+
+            Assert.Equal(fromAllocations.Years.Select(year => year.Next.SavingsYen), fromRaw.Years.Select(year => year.Next.SavingsYen));
+            Assert.Equal(fromAllocations.FinalState.InvestmentYen, fromRaw.FinalState.InvestmentYen);
+        }
+
+        private static AllocationInput InputOf(string living, string saving, string invest) =>
+            new AllocationInput(
+                BigInteger.Parse(living, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture),
+                BigInteger.Parse(saving, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture),
+                BigInteger.Parse(invest, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture));
 
         [Fact]
         public void ResultsRefuseTheWrongSide()

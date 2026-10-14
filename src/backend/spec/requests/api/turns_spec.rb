@@ -89,35 +89,35 @@ RSpec.describe "POST /api/games/turns", type: :request do
       end
       expect(Turn.count).to eq(0)
     end
-
-    it "配分が 32 ビット整数の範囲を超えるときは 400（ホストには渡さない）" do
-      expect(CoreHostClient).not_to receive(:replay)
-
-      post_turn(body: turn_body(turn_no: 1, living: 2**31), token: token)
-      expect(response).to have_http_status(:bad_request)
-
-      post_turn(body: turn_body(turn_no: 1, invest: -(2**31) - 1), token: token)
-      expect(response).to have_http_status(:bad_request)
-    end
   end
 
-  describe "32 ビット整数の範囲の端（400 にせず、ホストに渡す。規則の判定はホストが行う）" do
-    it "最大値（2**31 - 1）は、Rails では拒否せずホストに渡す" do
-      travel_to(start) { post_turn(body: turn_body(turn_no: 1, living: 2**31 - 1), token: token) }
+  # 配分の範囲・刻み・合計は Rails が見ない（整数であることだけを見る）。判定はホストの replay（Domain Core）が行い、規則違反は 422。
+  describe "配分の値の範囲（Rails は問わない。判定はホストが行う）" do
+    it "32 ビット整数の範囲の外でも、整数であれば 400 にせずホストに渡す（規則違反の理由コードを 422 にし、保存しない）" do
+      allow(CoreHostClient).to receive(:replay).and_raise(ApiError.new(:allocation_step_mismatch))
+
+      travel_to(start) { post_turn(body: turn_body(turn_no: 1, living: 2**31), token: token) }
 
       expect(CoreHostClient).to have_received(:replay).with(
-        seed: 12_345, difficulty: "normal", history: [ { living_pct: 2**31 - 1, saving_pct: 20, invest_pct: 20 } ]
+        seed: 12_345, difficulty: "normal", history: [ { living_pct: 2**31, saving_pct: 20, invest_pct: 20 } ]
       )
-      expect(response).to have_http_status(:created)
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(error_code).to eq("allocation_step_mismatch")
+      expect(Turn.count).to eq(0)
     end
 
-    it "最小値（-(2**31)）は、Rails では拒否せずホストに渡す" do
-      travel_to(start) { post_turn(body: turn_body(turn_no: 1, invest: -(2**31)), token: token) }
+    it "桁数の多い負の整数も、400 にせずホストに渡す（規則違反は 422）" do
+      allow(CoreHostClient).to receive(:replay).and_raise(ApiError.new(:allocation_negative))
+      huge = 10**30
+
+      travel_to(start) { post_turn(body: turn_body(turn_no: 1, invest: -huge), token: token) }
 
       expect(CoreHostClient).to have_received(:replay).with(
-        seed: 12_345, difficulty: "normal", history: [ { living_pct: 60, saving_pct: 20, invest_pct: -(2**31) } ]
+        seed: 12_345, difficulty: "normal", history: [ { living_pct: 60, saving_pct: 20, invest_pct: -huge } ]
       )
-      expect(response).to have_http_status(:created)
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(error_code).to eq("allocation_negative")
+      expect(Turn.count).to eq(0)
     end
   end
 
@@ -188,7 +188,7 @@ RSpec.describe "POST /api/games/turns", type: :request do
   end
 
   describe "保存済みの番号の再送" do
-    # 受け入れ条件 3（保存済みの番号の再送は 200）を、4（完走・破綻は 409）より優先する。4 は新しい番号の保存に当てる。
+    # 受け入れ条件 3：同じ配分の再送は 200（保存せず、保存済みの結果を返す）。配分が違えば 409。ゲームが終了していれば、再送も 409（受け入れ条件 4）。
     it "同じ番号・同じ配分は保存せず、保存済みの結果を 200 で返す（1 秒以上あけた再送）" do
       travel_to(start) { post_turn(body: turn_body(turn_no: 1), token: token) }
       first_turn = json_response.fetch("turn")
@@ -278,19 +278,34 @@ RSpec.describe "POST /api/games/turns", type: :request do
       expect(Turn.count).to eq(0)
     end
 
-    # 受け入れ条件 4（完走・破綻は 409）は新しい番号の保存に当てる。保存済みの番号の再送は、受け入れ条件 3 に従い 200 にする（優先の理由は PR 本文）。
-    it "完走・破綻したゲームでも、保存済みの番号を同じ配分で再送すると 200（保存済みの結果）" do
+    # 受け入れ条件 4：ゲームが終了していれば 409（新しい番号も、保存済みの番号の再送も）。ホストは呼ばない。
+    it "完走・破綻したゲームでは、保存済みの番号を同じ配分で再送しても 409（game_finished）" do
       travel_to(start) { post_turn(body: turn_body(turn_no: 1), token: token) }
-      game.update!(status: "completed")
+      game.update!(status: "bankrupt")
+      expect(CoreHostClient).not_to receive(:replay)
 
       travel_to(start + 2) { post_turn(body: turn_body(turn_no: 1), token: token) }
 
-      expect(response).to have_http_status(:ok)
+      expect(response).to have_http_status(:conflict)
+      expect(error_code).to eq("game_finished")
       expect(Turn.count).to eq(1)
     end
 
-    # 最後のターンで完走したあと、応答が届かなかった再試行。保存済みの結果（評価を含む GAME）を返す。
-    it "完走で保存された最後の番号を再送すると（応答を失った再試行）、200 で評価を含む GAME を返す" do
+    it "完走・破綻したゲームでは、保存済みの番号を違う配分で送っても、配分の違いより先に 409（game_finished）" do
+      travel_to(start) { post_turn(body: turn_body(turn_no: 1), token: token) }
+      game.update!(status: "completed")
+
+      travel_to(start + 2) do
+        post_turn(body: turn_body(turn_no: 1, living: 70, saving: 10, invest: 20), token: token)
+      end
+
+      expect(response).to have_http_status(:conflict)
+      expect(error_code).to eq("game_finished")
+      expect(Turn.sole).to have_attributes(living_pct: 60, saving_pct: 20, invest_pct: 20)
+    end
+
+    # 最後のターンで完走したあと、応答が届かなかった再試行も 409。最終結果は GET /api/game（評価を含む GAME）で読む。
+    it "完走で保存された最後の番号を再送すると（応答を失った再試行）、409（game_finished）" do
       42.times do |index|
         Turn.create!(game: game, session: game.session, turn_no: index + 1, age: 22 + index, living_pct: 60, saving_pct: 20,
                      invest_pct: 20, savings_after: 0, invest_after: 0, satisfaction_after: 60)
@@ -301,10 +316,8 @@ RSpec.describe "POST /api/games/turns", type: :request do
 
       travel_to(start + 2) { post_turn(body: turn_body(turn_no: 43), token: token) }
 
-      expect(response).to have_http_status(:ok)
-      expect(json_response.fetch("turn")).to include("turn_no" => 43, "age" => 64)
-      expect(json_response.fetch("game")).to include("status" => "completed", "current_age" => 65)
-      expect(json_response.dig("game", "evaluation")).to eq(evaluation_output)
+      expect(response).to have_http_status(:conflict)
+      expect(error_code).to eq("game_finished")
       expect(Turn.count).to eq(43)
     end
   end
@@ -326,13 +339,15 @@ RSpec.describe "POST /api/games/turns", type: :request do
 
   describe "同じ番号の同時の要求（一意制約の衝突）" do
     # 別の要求が、この要求の再計算の間に同じ番号を先に保存した順番を再現する（同時実行の代わりに決まった順で行う）。
-    def competing_save_during_replay(living:, saving:, invest:)
+    # finish: true なら、先に保存した要求がゲームを完走させた順番も再現する。
+    def competing_save_during_replay(living:, saving:, invest:, finish: false)
       calls = 0
       allow(CoreHostClient).to receive(:replay) do |**args|
         calls += 1
         if calls == 1
           Turn.create!(game: game, session: game.session, turn_no: 1, age: 22, living_pct: living, saving_pct: saving,
                        invest_pct: invest, savings_after: 1_000, invest_after: 0, satisfaction_after: 60)
+          game.update!(status: "completed", current_age: 65) if finish
         end
         fake_replay(**args)
       end
@@ -356,6 +371,18 @@ RSpec.describe "POST /api/games/turns", type: :request do
       expect(response).to have_http_status(:conflict)
       expect(error_code).to eq("turn_allocation_mismatch")
       expect(Turn.sole).to have_attributes(living_pct: 70)
+    end
+
+    # 同じ番号を先に保存した要求が、ゲームを完走させていたら、同じ配分でも 409（受け入れ条件 4。保存済みの結果は返さない）。
+    it "先に保存したのが完走なら、同じ配分でも 409（game_finished）。保存は 1 件のまま" do
+      competing_save_during_replay(living: 60, saving: 20, invest: 20, finish: true)
+
+      travel_to(start) { post_turn(body: turn_body(turn_no: 1), token: token) }
+
+      expect(response).to have_http_status(:conflict)
+      expect(error_code).to eq("game_finished")
+      expect(Turn.where(turn_no: 1).count).to eq(1)
+      expect(game.reload).to have_attributes(status: "completed", current_age: 65)
     end
   end
 

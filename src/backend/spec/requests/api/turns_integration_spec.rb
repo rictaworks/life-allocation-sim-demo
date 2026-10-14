@@ -39,4 +39,25 @@ RSpec.describe "再計算ホストの実物との統合（POST /api/games/turns�
     expect(error_code).to eq("allocation_sum_mismatch")
     expect(Turn.count).to eq(0)
   end
+
+  # 32 ビット整数の範囲の外や桁数の多い整数も、Rails では 400 にせず、実物のホストの規則（Domain Core）で判定する。
+  # 規則違反の理由コードは 422 になり、ホストの例外（500）にはならない。
+  {
+    "4294967296" => "allocation_step_mismatch",
+    "2147483648" => "allocation_step_mismatch",
+    "4294967295" => "allocation_sum_mismatch",
+    "1000000000000000000000000000000" => "allocation_sum_mismatch",
+    "-2147483649" => "allocation_negative"
+  }.each do |living, code|
+    it "配分の値 #{living} は、実物のホストの規則で #{code}（422）になり、保存しない" do
+      token = issue_session_token
+      Game.create!(session: Session.find_active(token), seed: 12_345, difficulty: "normal", status: "playing", current_age: 22)
+
+      post_turn_json(token, %({"turn_no":1,"living_pct":#{living},"saving_pct":0,"invest_pct":0,"website":""}))
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(error_code).to eq(code)
+      expect(Turn.count).to eq(0)
+    end
+  end
 end

@@ -1,7 +1,7 @@
 # 1 年ぶんの配分の保存（POST /api/games/turns の中身）。
-# 順番：ゲームの確認（404）→ 保存済みの番号の再送（頻度の確認 turn_save を通してから、保存済みの結果を返す。
-#   保存はしない。完走・破綻の判定より先に見る）→ 終了の確認（409。新しい番号だけ）→ 番号の確認（409）
-#   → 頻度の確認（429。turn_save。ホストは呼ばない）→ 再計算（ホスト）→ 保存。
+# 順番：ゲームの確認（404）→ 終了の確認（409。保存済みの番号の再送も含む。終了の判定は保存された status。頻度は数えず、ホストは呼ばない）
+#   → 保存済みの番号の再送（頻度の確認 turn_save の後、同じ配分なら保存済みの結果 200、違えば 409。配分の規則は見ない）
+#   → 番号の確認（409）→ 頻度の確認（429。turn_save。ホストは呼ばない）→ 再計算（ホスト。規則違反は 422）→ 保存。
 # 頻度は、再送も新しい保存も同じ枠（turn_save：1 秒 1 件・1 分 20 件）で数える（受け入れ条件 9）。
 # ホストの呼び出し（最大 5 秒）は、書き込みの transaction の中で行わない（GameStarter と同じ）。
 # 年次の値は、ホストの結果だけを保存する。クライアントの値は、ホストに渡す配分の 1 年ぶんとしてだけ使う。
@@ -14,10 +14,12 @@ class TurnSaver
       game = session.game
       raise ApiError.new(:game_not_found) if game.nil?
 
+      # 終了している（完走・破綻）なら、新しい番号も保存済みの番号の再送も 409。ホストは呼ばない（受け入れ条件 4）。
+      raise ApiError.new(:game_finished) unless game.playing?
+
       saved = saved_turns(game)
       return resend(session, game, saved, turn_request) if turn_request.turn_no.between?(1, saved.size)
 
-      raise ApiError.new(:game_finished) unless game.playing?
       raise ApiError.new(:turn_conflict) unless turn_request.turn_no == saved.size + 1
 
       # 頻度の確認は、ホストを呼ぶ前に行う（超過は 429。ホストは呼ばない）。
@@ -37,8 +39,8 @@ class TurnSaver
       game.turns.order(:turn_no).to_a
     end
 
-    # 保存済みの番号の再送。保存はしないが、GAME を得るためにホストを呼ぶ。頻度は新しい保存と同じ枠（turn_save）で数え、
-    # 超過は 429（ホストは呼ばない）。ゲームの終了は見ない（完走のあとの再試行でも、保存済みの結果を返す）。
+    # 保存済みの番号の再送（ゲームは終了していない）。保存はしないが、GAME を得るためにホストを呼ぶ。頻度は新しい保存と同じ枠（turn_save）で数え、
+    # 超過は 429（ホストは呼ばない）。
     def resend(session, game, saved, turn_request)
       RequestRateLimit.consume!(kind: :turn_save, key: session.id)
       saved_result(game, saved, turn_request)
@@ -76,13 +78,15 @@ class TurnSaver
       )
     end
 
-    # 保存する。一意制約の衝突（同じ番号が先に保存された）は、保存済みの結果として扱う（配分が同じなら 200、違えば 409）。
+    # 保存する。一意制約の衝突（同じ番号が先に保存された）は、先の保存を見直す。その保存でゲームが終わっていれば 409（受け入れ条件 4）。
+    # 終わっていなければ、保存済みの番号の再送と同じく扱う（配分が同じなら 200、違えば 409）。
     def save(session, game, turn_request, replayed, host_turn)
       write_turn!(session, game, turn_request, replayed, host_turn)
       created_result(game, replayed, host_turn)
     rescue ActiveRecord::RecordNotUnique
       current = Game.find_by(id: game.id, session_id: session.id)
       raise ApiError.new(:game_not_found) if current.nil?
+      raise ApiError.new(:game_finished) unless current.playing?
 
       saved_result(current, saved_turns(current), turn_request)
     end

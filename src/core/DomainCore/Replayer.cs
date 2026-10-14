@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace DomainCore
 {
@@ -11,8 +12,15 @@ namespace DomainCore
     /// </summary>
     public static class Replayer
     {
-        /// <summary>配分の列を順に適用する。失敗したら、どのターンで何が起きたかを返す。</summary>
-        public static ReplayResult Replay(GameStart start, long seed, IReadOnlyList<Allocation> history)
+        /// <summary>配分の列（int の値）を順に適用する。規則に反する年があれば、その年で失敗する（検査は入力版と同じ）。失敗したら、どのターンで何が起きたかを返す。</summary>
+        public static ReplayResult Replay(GameStart start, long seed, IReadOnlyList<Allocation> history) =>
+            Replay(start, seed, history.Select(allocation => (AllocationInput)allocation).ToArray());
+
+        /// <summary>
+        /// 入力の配分の列を順に適用する。各年の配分は、精算の前に規則で検査する（任意の桁数の整数。範囲の外の値も理由で返す）。
+        /// 失敗したら、どのターンで何が起きたかを返す。
+        /// </summary>
+        public static ReplayResult Replay(GameStart start, long seed, IReadOnlyList<AllocationInput> history)
         {
             var random = new SeededRandom(seed);
             var state = start.InitialState;
@@ -26,7 +34,13 @@ namespace DomainCore
                     return ReplayResult.Invalid(new ReplayFailure(turnNo, state.Age, ReplayViolation.GameFinished, null));
                 }
 
-                var step = YearSettlement.Advance(state, history[index], start.Difficulty, random);
+                var allocation = Simulator.ValidateAllocationInput(history[index]);
+                if (!allocation.IsValid)
+                {
+                    return ReplayResult.Invalid(new ReplayFailure(turnNo, state.Age, ReplayViolation.InvalidAllocation, allocation.Reason));
+                }
+
+                var step = YearSettlement.Advance(state, allocation.Value, start.Difficulty, random);
                 if (!step.IsValid)
                 {
                     return ReplayResult.Invalid(new ReplayFailure(turnNo, state.Age, ReplayViolation.InvalidAllocation, step.Reason));

@@ -131,6 +131,8 @@
 
 負でなく 5 の倍数で合計が 100 なら、各項目は 0〜100 に収まります。
 
+入力は、int（`Allocation`）のほか、任意の桁数の整数（`AllocationInput`。再計算ホストが JSON から読む形）でも受け取ります（`Simulator.ValidateAllocationInput`）。判定は同じで、32 ビットの範囲の外の値も、同じ理由で止めます。
+
 ## 乱数（`SeededRandom`）
 
 - 方式は SplitMix64 です（定数はアルゴリズムで決まる値）。状態の初期値は seed を `ulong` に変換した値です。seed 0 も有効です。
@@ -139,7 +141,7 @@
 
 ## 再現（`Replayer.Replay`）
 
-入力は、開始状態・seed・配分の履歴（1 年目から順）です。
+入力は、開始状態・seed・配分の履歴（1 年目から順）です。配分の履歴は、int（`Allocation`）でも、任意の桁数の整数（`AllocationInput`）でも渡せます。後者は、各年の精算の前に上の判定をします。
 
 - 年ごとに `YearSettlement.Advance` を順に適用します。
 - 完走または破綻のあとに配分が来たら、`game_finished` で止めます。`turn_no` はその番号です。

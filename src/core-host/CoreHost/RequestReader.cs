@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
+using System.Numerics;
 using System.Text.Json;
 using System.Text.Unicode;
 using CoreHost.Config;
@@ -152,15 +154,15 @@ namespace CoreHost
             return seed;
         }
 
-        /// <summary>配分の履歴。各要素は、生活費・貯蓄・投資の整数の %。</summary>
-        public static Allocation[] ReadHistory(JsonElement root)
+        /// <summary>配分の履歴。各要素は、生活費・貯蓄・投資の整数の %（任意の桁数。範囲・刻み・合計は Domain Core が確かめる）。</summary>
+        public static AllocationInput[] ReadHistory(JsonElement root)
         {
             if (!root.TryGetProperty(ProtocolNames.History, out var list) || list.ValueKind != JsonValueKind.Array)
             {
                 throw InvalidRequest();
             }
 
-            var allocations = new List<Allocation>();
+            var allocations = new List<AllocationInput>();
             foreach (var item in list.EnumerateArray())
             {
                 allocations.Add(ReadAllocation(item));
@@ -169,22 +171,33 @@ namespace CoreHost
             return allocations.ToArray();
         }
 
-        private static Allocation ReadAllocation(JsonElement item)
+        private static AllocationInput ReadAllocation(JsonElement item)
         {
             if (item.ValueKind != JsonValueKind.Object)
             {
                 throw InvalidRequest();
             }
 
-            return new Allocation(
+            return new AllocationInput(
                 ReadPercent(item, ProtocolNames.LivingPct),
                 ReadPercent(item, ProtocolNames.SavingPct),
                 ReadPercent(item, ProtocolNames.InvestPct));
         }
 
-        private static int ReadPercent(JsonElement item, string name)
+        /// <summary>
+        /// 配分の 1 項目（整数の %）。数の字面を、符号付きの整数として読む。桁数には上限を置かない（範囲の外の値も、規則の理由で拒否するため）。
+        /// 数でない値（文字列・真偽値・null など）と、整数でない字面（小数点や指数を含むもの）は request_invalid で拒否する。
+        /// </summary>
+        private static BigInteger ReadPercent(JsonElement item, string name)
         {
-            if (!item.TryGetProperty(name, out var value) || !value.TryGetInt32(out var percent))
+            // TryGetInt32 などは、数でない値に対して例外（InvalidOperationException）を投げるため、先に数かどうかを確かめる
+            if (!item.TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.Number)
+            {
+                throw InvalidRequest();
+            }
+
+            // 符号と数字だけを許す（小数点・指数は読めず、拒否される）
+            if (!BigInteger.TryParse(value.GetRawText(), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var percent))
             {
                 throw InvalidRequest();
             }

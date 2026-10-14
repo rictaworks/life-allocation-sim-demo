@@ -207,6 +207,52 @@ namespace CoreHost.Tests
             Assert.Equal(ProtocolCodes.RequestInvalid, ErrorOf(text).GetProperty(ProtocolNames.ErrorCode).GetString());
         }
 
+        // 32 ビットの範囲の外の整数は、形式の誤り（request_invalid）ではなく、Domain Core の規則で判定する（理由コードで 2 にする）。
+        [Theory]
+        [InlineData("4294967296", "0", "0", ProtocolCodes.AllocationStepMismatch)]
+        [InlineData("2147483648", "0", "0", ProtocolCodes.AllocationStepMismatch)]
+        [InlineData("4294967295", "0", "0", ProtocolCodes.AllocationSumMismatch)]
+        [InlineData("1000000000000000000000000000000", "0", "0", ProtocolCodes.AllocationSumMismatch)]
+        [InlineData("-2147483649", "0", "102", ProtocolCodes.AllocationNegative)]
+        public void AllocationsOutsideInt32AreJudgedByTheRules(string living, string saving, string invest, string code)
+        {
+            var (exit, text) = Run(ProtocolNames.ReplayCommand, RawReplayJson(living, saving, invest));
+
+            Assert.Equal(ProtocolLimits.ExitRuleViolation, exit);
+            var error = ErrorOf(text);
+            Assert.Equal(code, error.GetProperty(ProtocolNames.ErrorCode).GetString());
+            Assert.Equal(1, error.GetProperty(ProtocolNames.TurnNo).GetInt32());
+        }
+
+        [Fact]
+        public void AllocationOutsideInt32InALaterTurnReportsThatTurn()
+        {
+            var history = $"[{RawAllocation("60", "20", "20")},{RawAllocation("4294967296", "0", "0")}]";
+            var body = $"{{\"{ProtocolNames.Seed}\":7,\"{ProtocolNames.Difficulty}\":\"{Code}\",\"{ProtocolNames.History}\":{history}}}";
+
+            var (exit, text) = Run(ProtocolNames.ReplayCommand, body);
+
+            Assert.Equal(ProtocolLimits.ExitRuleViolation, exit);
+            var error = ErrorOf(text);
+            Assert.Equal(ProtocolCodes.AllocationStepMismatch, error.GetProperty(ProtocolNames.ErrorCode).GetString());
+            Assert.Equal(2, error.GetProperty(ProtocolNames.TurnNo).GetInt32());
+        }
+
+        // 整数でない値（小数・指数表記・文字列・真偽値・null）は、範囲にかかわらず request_invalid のまま。
+        [Theory]
+        [InlineData("70.5")]
+        [InlineData("1e2")]
+        [InlineData("\"60\"")]
+        [InlineData("true")]
+        [InlineData("null")]
+        public void NonIntegerAllocationValuesAreStillRequestInvalid(string value)
+        {
+            var (exit, text) = Run(ProtocolNames.ReplayCommand, RawReplayJson(value, "20", "20"));
+
+            Assert.Equal(ProtocolLimits.ExitRuleViolation, exit);
+            Assert.Equal(ProtocolCodes.RequestInvalid, ErrorOf(text).GetProperty(ProtocolNames.ErrorCode).GetString());
+        }
+
         [Fact]
         public void UnknownCommandIsRejected()
         {
@@ -540,6 +586,13 @@ namespace CoreHost.Tests
                 $"{{\"{ProtocolNames.LivingPct}\":{turn.Living},\"{ProtocolNames.SavingPct}\":{turn.Saving},\"{ProtocolNames.InvestPct}\":{turn.Invest}}}"));
             return $"{{\"{ProtocolNames.Seed}\":{seed},\"{ProtocolNames.Difficulty}\":\"{Code}\",\"{ProtocolNames.History}\":[{items}]}}";
         }
+
+        /// <summary>1 年ぶんの配分の要求（値は JSON の字面のまま。整数の大きさや型を、テストで自由に変えるため）。</summary>
+        private static string RawReplayJson(string living, string saving, string invest) =>
+            $"{{\"{ProtocolNames.Seed}\":7,\"{ProtocolNames.Difficulty}\":\"{Code}\",\"{ProtocolNames.History}\":[{RawAllocation(living, saving, invest)}]}}";
+
+        private static string RawAllocation(string living, string saving, string invest) =>
+            $"{{\"{ProtocolNames.LivingPct}\":{living},\"{ProtocolNames.SavingPct}\":{saving},\"{ProtocolNames.InvestPct}\":{invest}}}";
 
         /// <summary>読み取りの途中で失敗する入力（内部エラーの確認用）。</summary>
         private sealed class FailingInput : Stream
