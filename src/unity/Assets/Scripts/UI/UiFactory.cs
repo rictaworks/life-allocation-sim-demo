@@ -182,11 +182,20 @@ namespace LifeAllocationSim.Ui
             slider.maxValue = max;
             slider.wholeNumbers = wholeNumbers;
             slider.value = min;
-            var fill = slider.fillRect != null ? slider.fillRect.GetComponent<Image>() : null;
-            if (fill != null)
+            // 塗りつぶしは DefaultControls.CreateSlider が必ず作る。無ければ作り方の誤りなので、無言で飛ばさず例外にする
+            var fillRect = slider.fillRect;
+            if (fillRect == null)
             {
-                fill.color = AppConfig.SliderFillColor;
+                throw new InvalidOperationException(LogTexts.SliderFillMissing);
             }
+
+            var fill = fillRect.GetComponent<Image>();
+            if (fill == null)
+            {
+                throw new InvalidOperationException(LogTexts.SliderFillImageMissing);
+            }
+
+            fill.color = AppConfig.SliderFillColor;
 
             if (onChanged != null)
             {

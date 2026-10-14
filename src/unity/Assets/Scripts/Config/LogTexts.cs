@@ -19,6 +19,8 @@ namespace LifeAllocationSim.Config
         public const string ResultMismatch = "保存結果と再計算の結果が一致しませんでした。ターン番号：{0}";
         public const string EvaluationMissing = "終了したゲームに評価がありません。";
         public const string FontMissing = "表示用のフォントが読み込めませんでした：{0}";
+        public const string SliderFillMissing = "スライダーに塗りつぶし（Fill Rect）がありません。";
+        public const string SliderFillImageMissing = "スライダーの塗りつぶし（Fill Rect）に Image がありません。";
         public const string SessionMissing = "進行中のゲームがありません。";
         public const string UndefinedValue = "定義されていない値です。";
     }

@@ -654,3 +654,113 @@ test('README は UNITY_EXE を必須として説明し、WSL の内部パスを�
   assert.doesNotMatch(readme, /\/mnt\/[a-z]\//, 'README に WSL の内部パスがある');
   assert.doesNotMatch(readme, /[A-Za-z]:\\/, 'README に Windows の絶対パスがある');
 });
+
+// ---------------------------------------------------------------------------
+// 無言の null スキップ：null の判定で何もせずに続ける if（else も throw も記録も無いもの）。
+// 検出器は判定の文と行を返すだけで、必要かどうかは判断しない。必要な部品（スライダーの塗りつぶし）は例外にして、
+// 任意の引数や任意の表示（onClick・onChanged・notice など）は仕様として省略してよいので、この検査の対象にしない。
+// ---------------------------------------------------------------------------
+
+// open の ( か { に対応する閉じ括弧の位置。対応が無ければ例外にして、検査が黙って通らないようにする
+function closingIndex(code, open) {
+  const close = code[open] === '(' ? ')' : '}';
+  let depth = 0;
+  for (let i = open; i < code.length; i += 1) {
+    if (code[i] === code[open]) depth += 1;
+    if (code[i] === close) {
+      depth -= 1;
+      if (depth === 0) return i;
+    }
+  }
+  throw new Error(`対応する ${close} が見つからない（${lineOf(code, open)} 行目）`);
+}
+
+// 無言の null スキップ（条件が null の判定で、else が無く、本文に throw も Debug.Log も無い if）の行と判定の文
+function findSilentNullSkips(source) {
+  // null の判定：== null・!= null・is null・is not null・IsNullOrEmpty・IsNullOrWhiteSpace、値型の HasValue
+  const nullTest = /(?:==|!=)\s*null\b|\bis\s+(?:not\s+)?null\b|\bIsNull(?:OrEmpty|OrWhiteSpace)\s*\(|\.HasValue\b/;
+  const code = csharpCode(source);
+  const skips = [];
+  for (const match of code.matchAll(/\bif\s*\(/g)) {
+    const open = match.index + match[0].length - 1;
+    const close = closingIndex(code, open);
+    const condition = code.slice(open + 1, close).trim();
+    if (!nullTest.test(condition)) continue;
+
+    let start = close + 1;
+    while (start < code.length && /\s/.test(code[start])) start += 1;
+    let end;
+    if (code[start] === '{') {
+      end = closingIndex(code, start) + 1;
+    } else {
+      const semicolon = code.indexOf(';', start);
+      if (semicolon === -1) throw new Error(`if の本文の ; が見つからない（${lineOf(code, match.index)} 行目）`);
+      end = semicolon + 1;
+    }
+
+    const body = code.slice(start, end);
+    if (/^\s*else\b/.test(code.slice(end))) continue;
+    if (/\bthrow\b/.test(body) || /\bDebug\.Log(?:Warning|Error|Exception)?\s*\(/.test(body)) continue;
+    skips.push({ line: lineOf(code, match.index), condition });
+  }
+  return skips;
+}
+
+test('無言の null スキップの検出器は、違反の例を見つけ、正しい書き方を見逃さない（自己確認）', () => {
+  const bad = [
+    'class A {',
+    '  void F(Image fill, string text, Slider s, float? v) {',
+    '    if (fill != null) { fill.color = C; }',
+    '    if (s == null) return;',
+    '    if (!string.IsNullOrEmpty(text)) { Use(text); }',
+    '    if (text is null) { Other(); }',
+    '    if (v.HasValue) { Use(v.Value); }',
+    '  }',
+    '}',
+  ].join('\n');
+  assert.deepEqual(findSilentNullSkips(bad), [
+    { line: 3, condition: 'fill != null' },
+    { line: 4, condition: 's == null' },
+    { line: 5, condition: '!string.IsNullOrEmpty(text)' },
+    { line: 6, condition: 'text is null' },
+    { line: 7, condition: 'v.HasValue' },
+  ], '本文に throw も記録も無い null の判定を、行と判定の文で見つけるべき');
+
+  const good = [
+    'class A {',
+    '  void F(Image fill, Slider s) {',
+    '    if (fill == null) { throw new System.InvalidOperationException(M); }',
+    '    if (fill != null) { fill.color = C; } else { throw new System.InvalidOperationException(M); }',
+    '    if (fill == null) { Debug.LogWarning(M); return; }',
+    '    if (s.Count > 0) { Use(); }',
+    '    var z = "if (fill != null) { }";',
+    '    // if (fill != null) { }',
+    '  }',
+    '}',
+  ].join('\n');
+  assert.deepEqual(findSilentNullSkips(good), [], 'throw・記録・else のある判定、null の判定ではない if、文字列とコメントの中は違反にしない');
+  assert.throws(() => findSilentNullSkips('if (fill != null { Use(); }'), /対応する \) が見つからない/, '対応する括弧が無いときは黙って通さず例外にする');
+});
+
+test('スライダーの塗りつぶしは、無いときに例外を投げ、無言で飛ばさない（UiFactory.cs）', () => {
+  const source = read('src/unity/Assets/Scripts/UI/UiFactory.cs');
+  const silentFill = findSilentNullSkips(source).filter((skip) => /\bfill(?:Rect)?\b/.test(skip.condition));
+  assert.deepEqual(silentFill, [], '塗りつぶしの判定が、無いときに無言で飛ばしている');
+
+  const code = csharpCode(source);
+  assert.match(
+    code,
+    /if\s*\(\s*(?:slider\.)?fillRect\s*==\s*null\s*\)\s*\{\s*throw new InvalidOperationException\(LogTexts\.SliderFillMissing\);\s*\}/,
+    'fillRect が無いときに例外を投げていない',
+  );
+  assert.match(
+    code,
+    /if\s*\(\s*fill\s*==\s*null\s*\)\s*\{\s*throw new InvalidOperationException\(LogTexts\.SliderFillImageMissing\);\s*\}/,
+    'Image が無いときに例外を投げていない',
+  );
+  assert.match(code, /fill\.color = AppConfig\.SliderFillColor;/, '正常時の塗りつぶしの色の設定が無い');
+
+  const logTexts = read('src/unity/Assets/Scripts/Config/LogTexts.cs');
+  assert.match(logTexts, /\bSliderFillMissing = "[^"\n]+";/, 'LogTexts に SliderFillMissing が無い');
+  assert.match(logTexts, /\bSliderFillImageMissing = "[^"\n]+";/, 'LogTexts に SliderFillImageMissing が無い');
+});
