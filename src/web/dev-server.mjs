@@ -46,7 +46,7 @@ async function statRegularFile(file) {
     const stats = await fs.promises.stat(file);
     return stats.isFile() ? file : null;
   } catch (error) {
-    if (error.code === 'ENOENT' || error.code === 'ENOTDIR') return null;
+    if (error.code === config.fsErrorCodes.notFound || error.code === config.fsErrorCodes.notDirectory) return null;
     throw error;
   }
 }
@@ -80,8 +80,8 @@ async function locateStaticFile(root, pathname) {
  */
 function sendText(res, status, message, headers = {}) {
   res.writeHead(status, {
-    'Content-Type': 'text/plain; charset=utf-8',
-    'X-Content-Type-Options': 'nosniff',
+    [config.responseHeaders.contentType]: config.plainTextMimeType,
+    [config.responseHeaders.contentTypeOptions]: config.headerValues.nosniff,
     ...headers,
   });
   res.end(`${message}\n`);
@@ -102,12 +102,12 @@ async function sendStaticFile(req, res, file, status) {
     ? config.mimeTypes[extension]
     : config.defaultMimeType;
   res.writeHead(status, {
-    'Content-Type': contentType,
-    'Content-Length': stats.size,
-    'Cache-Control': 'no-store',
-    'X-Content-Type-Options': 'nosniff',
+    [config.responseHeaders.contentType]: contentType,
+    [config.responseHeaders.contentLength]: stats.size,
+    [config.responseHeaders.cacheControl]: config.headerValues.noStore,
+    [config.responseHeaders.contentTypeOptions]: config.headerValues.nosniff,
   });
-  if (req.method === 'HEAD') {
+  if (req.method === config.methods.head) {
     res.end();
     return;
   }
@@ -121,7 +121,7 @@ async function sendStaticFile(req, res, file, status) {
  */
 function normalizeAddress(address) {
   if (typeof address !== 'string' || address === '') return null;
-  return address.startsWith('::ffff:') ? address.slice('::ffff:'.length) : address;
+  return address.startsWith(config.ipv4MappedPrefix) ? address.slice(config.ipv4MappedPrefix.length) : address;
 }
 
 /**
@@ -131,9 +131,9 @@ function normalizeAddress(address) {
  */
 function isDroppedRequestHeader(name) {
   return config.hopByHopHeaders.includes(name)
-    || name === 'x-real-ip'
-    || name === 'forwarded'
-    || name.startsWith('x-forwarded-');
+    || name === config.requestHeaders.realIp
+    || name === config.requestHeaders.forwarded
+    || name.startsWith(config.requestHeaders.forwardedPrefix);
 }
 
 /**
@@ -153,7 +153,7 @@ function proxyToRails(req, res, ctx) {
     if (value === undefined || isDroppedRequestHeader(name)) continue;
     headers[name] = value;
   }
-  headers['x-real-ip'] = clientAddress;
+  headers[config.requestHeaders.realIp] = clientAddress;
 
   const upstream = http.request({
     host: ctx.rails.host,
@@ -166,7 +166,7 @@ function proxyToRails(req, res, ctx) {
   let timedOut = false;
   upstream.on('timeout', () => {
     timedOut = true;
-    upstream.destroy(new Error('upstream timeout'));
+    upstream.destroy(new Error(config.log.upstreamTimeoutDetail));
   });
   upstream.on('response', (upstreamRes) => {
     const responseHeaders = {};
@@ -222,8 +222,10 @@ async function handleRequest(req, res, ctx) {
     proxyToRails(req, res, ctx);
     return;
   }
-  if (req.method !== 'GET' && req.method !== 'HEAD') {
-    sendText(res, 405, config.messages.methodNotAllowed, { Allow: 'GET, HEAD' });
+  if (req.method !== config.methods.get && req.method !== config.methods.head) {
+    sendText(res, 405, config.messages.methodNotAllowed, {
+      [config.responseHeaders.allow]: [config.methods.get, config.methods.head].join(', '),
+    });
     return;
   }
   let file;
@@ -268,7 +270,7 @@ function createServer(ctx) {
  */
 function parseRailsOrigin(origin) {
   const url = new URL(origin);
-  if (url.protocol !== 'http:') {
+  if (url.protocol !== config.upstreamProtocol) {
     throw new Error(config.messages.railsOriginInvalid);
   }
   return {
@@ -329,7 +331,9 @@ export async function startDevServer(options = {}) {
     throw new Error(config.messages.internalError);
   }
   return {
-    url: config.localUrlTemplate.replace('{host}', host).replace('{port}', String(address.port)),
+    url: config.localUrlTemplate
+      .replace(config.localUrlPlaceholders.host, host)
+      .replace(config.localUrlPlaceholders.port, String(address.port)),
     close: () => closeServer(server),
   };
 }

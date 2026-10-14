@@ -7,7 +7,39 @@ export const config = Object.freeze({
   requestUrlBase: 'http://localhost',
   // 起動したときに表示する URL の形（{host} と {port} を置き換える）
   localUrlTemplate: 'http://{host}:{port}',
+  localUrlPlaceholders: Object.freeze({
+    host: '{host}',
+    port: '{port}',
+  }),
   upstreamTimeoutMs: 10000,
+  // 転送先の URL のプロトコル（http だけを受け付ける）
+  upstreamProtocol: 'http:',
+  // IPv4 を射影した IPv6 アドレスの接頭辞（接続元のアドレスから外す）
+  ipv4MappedPrefix: '::ffff:',
+  // HTTP のメソッド名（受け付けるのは GET と HEAD だけ）
+  methods: Object.freeze({
+    get: 'GET',
+    head: 'HEAD',
+  }),
+  // 受け取るヘッダー名（Node は小文字で渡すため、小文字で書きます）
+  requestHeaders: Object.freeze({
+    realIp: 'x-real-ip',
+    forwarded: 'forwarded',
+    forwardedPrefix: 'x-forwarded-',
+  }),
+  // 送るヘッダー名（送るときの表記で書きます）
+  responseHeaders: Object.freeze({
+    allow: 'Allow',
+    cacheControl: 'Cache-Control',
+    contentLength: 'Content-Length',
+    contentType: 'Content-Type',
+    contentTypeOptions: 'X-Content-Type-Options',
+  }),
+  // 送るヘッダーの値
+  headerValues: Object.freeze({
+    noStore: 'no-store',
+    nosniff: 'nosniff',
+  }),
   hopByHopHeaders: Object.freeze([
     'connection',
     'keep-alive',
@@ -19,6 +51,11 @@ export const config = Object.freeze({
     'transfer-encoding',
     'upgrade',
   ]),
+  // ファイルシステムのエラーコード（Node が返す固定の語）
+  fsErrorCodes: Object.freeze({
+    notFound: 'ENOENT',
+    notDirectory: 'ENOTDIR',
+  }),
   appEnvName: 'APP_ENV',
   appEnvDevelopment: 'development',
   apiPathPrefix: '/api',
@@ -27,6 +64,8 @@ export const config = Object.freeze({
   notFoundFileName: '404.html',
   cleanUrlExtension: '.html',
   defaultMimeType: 'application/octet-stream',
+  // エラーの本文（テキスト）の型
+  plainTextMimeType: 'text/plain; charset=utf-8',
   mimeTypes: Object.freeze({
     '.html': 'text/html; charset=utf-8',
     '.css': 'text/css; charset=utf-8',
@@ -54,5 +93,7 @@ export const config = Object.freeze({
   }),
   log: Object.freeze({
     upstreamFailed: 'API の転送に失敗しました（接続の状態のみを表示します）。',
+    // 転送の時間切れを表す詳細（ログに出します。応答には出しません）
+    upstreamTimeoutDetail: 'upstream timeout',
   }),
 });
