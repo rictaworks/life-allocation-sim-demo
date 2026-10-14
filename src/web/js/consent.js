@@ -1,4 +1,4 @@
-// 同意（Consent Mode v2）と GA4 の読み込み。既定は拒否にし、同意の選択はこのブラウザの localStorage に保存する。
+// 同意（Consent Mode v2）と GA4 の読み込み。既定は拒否にし、gtag.js は「許可」のときだけ読み込む。同意の選択はこのブラウザの localStorage に保存する。
 // 保存や読み取りに失敗しても画面は止めず、コンソールに出す（黙って失敗させない）。
 import { config } from './config.js';
 import { requireElement } from './dom.js';
@@ -54,7 +54,8 @@ export class ConsentStore {
 
 /**
  * GA4（gtag.js）の読み込みと同意の更新。
- * 既定は全項目「拒否」にしてから、保存済みの選択を反映し、測定 ID を読み込む。
+ * 同意の既定（すべて拒否）は dataLayer に積む。gtag.js は、利用者が「許可」を選んだとき、または保存済みの「許可」で開いたときだけ読み込む。
+ * 未選択と「拒否」では、gtag.js の読み込みも Google への要求も行わない。
  */
 export class AnalyticsTag {
   /**
@@ -66,26 +67,40 @@ export class AnalyticsTag {
     this.win = win;
     this.doc = doc;
     this.logger = logger;
-    this.win.dataLayer = this.win.dataLayer || [];
+    if (this.win.dataLayer === undefined) {
+      this.win.dataLayer = [];
+    }
     this.gtag = createGtag(this.win);
+    this.loaded = false;
   }
 
   /**
+   * 同意の既定を積み、保存済みの選択を反映する。
    * @param {string | null} storedValue 保存済みの選択（未選択なら null）
    */
   start(storedValue) {
-    this.gtag('consent', 'default', {
-      ad_storage: 'denied',
-      ad_user_data: 'denied',
-      ad_personalization: 'denied',
-      analytics_storage: 'denied',
-    });
+    this.gtag('consent', 'default', { ...config.analytics.consentDefault });
     if (storedValue === config.analytics.consentGranted) {
-      this.update(config.analytics.consentGranted);
+      this.grant();
     }
-    this.gtag('js', new Date());
-    this.gtag('config', config.analytics.measurementId);
-    this.loadScript();
+  }
+
+  /**
+   * 利用者の選択を反映する。「許可」のときだけ計測を始める。「拒否」のときは同意の更新だけを送る（読み込まない）。
+   * @param {string} value config.analytics.consentGranted か consentDenied
+   */
+  applyChoice(value) {
+    if (value === config.analytics.consentGranted) {
+      this.grant();
+    } else {
+      this.update(value);
+    }
+  }
+
+  /** 分析を「許可」にして、計測を始める。 */
+  grant() {
+    this.update(config.analytics.consentGranted);
+    this.loadMeasurement();
   }
 
   /**
@@ -94,6 +109,15 @@ export class AnalyticsTag {
    */
   update(value) {
     this.gtag('consent', 'update', { analytics_storage: value });
+  }
+
+  /** 計測の命令を積み、gtag.js を読み込む。読み込みは一度だけにする。 */
+  loadMeasurement() {
+    if (this.loaded) return;
+    this.loaded = true;
+    this.gtag('js', new Date());
+    this.gtag('config', config.analytics.measurementId);
+    this.loadScript();
   }
 
   loadScript() {
@@ -140,19 +164,26 @@ export class ConsentBanner {
     const stored = this.store.read();
     this.analytics.start(stored);
     for (const button of this.banner.querySelectorAll('[data-consent-choice]')) {
-      button.addEventListener('click', () => this.choose(button.dataset.consentChoice ?? ''));
+      button.addEventListener('click', () => {
+        const value = button.dataset.consentChoice;
+        if (value === undefined) {
+          this.logger.error(config.log.consentChoiceMissing);
+          return;
+        }
+        this.choose(value);
+      });
     }
     this.reopen.addEventListener('click', () => this.showBanner(true));
     this.render(stored !== null);
   }
 
   /**
-   * 選択を保存し、分析の同意を更新して、バナーを閉じる。
+   * 選択を保存し、分析の同意に反映して、バナーを閉じる。
    * @param {string} value
    */
   choose(value) {
     this.store.write(value);
-    this.analytics.update(value);
+    this.analytics.applyChoice(value);
     this.render(true);
     this.main.focus();
   }

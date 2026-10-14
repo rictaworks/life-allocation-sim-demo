@@ -3,6 +3,10 @@ export const config = Object.freeze({
   host: '127.0.0.1',
   port: 8080,
   railsOrigin: 'http://localhost:3000',
+  // 要求の URL からパスを取り出すための基準（パスの解析にだけ使う。接続先ではない）
+  requestUrlBase: 'http://localhost',
+  // 起動したときに表示する URL の形（{host} と {port} を置き換える）
+  localUrlTemplate: 'http://{host}:{port}',
   upstreamTimeoutMs: 10000,
   hopByHopHeaders: Object.freeze([
     'connection',
@@ -19,6 +23,8 @@ export const config = Object.freeze({
   appEnvDevelopment: 'development',
   apiPathPrefix: '/api',
   indexFileName: 'index.html',
+  // 存在しないパスの応答に使うファイル（Vercel と同じく 404.html を 404 の応答として返す）
+  notFoundFileName: '404.html',
   cleanUrlExtension: '.html',
   defaultMimeType: 'application/octet-stream',
   mimeTypes: Object.freeze({
@@ -39,7 +45,6 @@ export const config = Object.freeze({
     refused: '開発用サーバーは APP_ENV が development のときだけ起動します。起動を取りやめました。',
     started: '開発用サーバーを起動しました。',
     railsOriginInvalid: 'API の転送先は http の URL で指定してください。',
-    notFound: '見つかりません。',
     badRequest: 'リクエストが正しくありません。',
     methodNotAllowed: 'このパスではその操作を受け付けません。',
     clientAddressMissing: '接続元のアドレスを確認できないため、API へ転送できません。',

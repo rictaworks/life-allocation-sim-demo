@@ -4,7 +4,8 @@
 const { test, expect } = require('@playwright/test');
 const support = require('./support');
 
-const PAGES = ['/', '/legal'];
+// 存在しないパスは 404 ページ（src/web/404.html）になる。404 ページも相談ボタンと重ならないことを確かめる。
+const PAGES = ['/', '/legal', '/no-such-page'];
 // 固定の配置にする最小の幅（src/web/css/site.css の @media と同じ値にする）
 const FIXED_MIN_WIDTH_PX = 1280;
 const NARROW_WIDTHS_PX = [320, 375, 414, 768, 1024, 1279];

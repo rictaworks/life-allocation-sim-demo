@@ -7,6 +7,13 @@ export const config = Object.freeze({
     consentStorageKey: 'life-allocation-sim.analytics-consent',
     consentGranted: 'granted',
     consentDenied: 'denied',
+    // Consent Mode v2 の既定（gtag.js を読み込む前に積む。すべて拒否）
+    consentDefault: Object.freeze({
+      ad_storage: 'denied',
+      ad_user_data: 'denied',
+      ad_personalization: 'denied',
+      analytics_storage: 'denied',
+    }),
   }),
   unity: Object.freeze({
     productName: 'LifeAllocationSim',
@@ -34,6 +41,7 @@ export const config = Object.freeze({
   log: Object.freeze({
     missingElement: '画面の必要な要素が見つかりません。',
     consentValueInvalid: '保存されていた同意の値が不正のため、無視します。',
+    consentChoiceMissing: '同意の選択ボタンに値（data-consent-choice）がありません。画面の作りを確かめてください。',
     analyticsLoadFailed: 'アクセス解析のスクリプトを読み込めませんでした。',
     unityLoaderFailed: 'Unity のローダーを読み込めませんでした。ビルドが unity/Build/ に配置されているか確認してください。',
     unityCreateMissing: 'Unity の起動関数（createUnityInstance）が見つかりません。',

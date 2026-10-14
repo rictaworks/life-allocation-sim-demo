@@ -8,10 +8,15 @@ Unity の画面を載せる HTML の殻（`src/web/`）の仕様です。見た�
 |---|---|---|
 | `/` | `src/web/index.html` | 人生配分シミュレーション（Unity の画面を読み込む） |
 | `/legal` | `src/web/legal.html` | 利用規約・免責事項・データの取り扱い・連絡先 |
+| 存在しないパス | `src/web/404.html` | 404 の応答で返す。トップページへの案内を出す |
 
 `/legal` は、Vercel の `cleanUrls`（`src/web/vercel.json`）で `legal.html` を指します。開発用サーバーも同じ規則で配ります。`/legal` の連絡先は、組織の窓口の `info@rictaworks.jp` だけです（個人名と個人のメールアドレスは書きません）。
 
+存在しないパスは、Vercel が `404.html` を 404 の応答として返します。開発用サーバーも同じ規則で返します。
+
 ## すべてのページに共通の要素（CLAUDE.md の必須要素）
+
+404 ページを含め、すべてのページに次の要素があります。
 
 - 最上部のバナー（アンバーの背景）：「これはデモ版です。データはサーバー再起動時にリセットされる場合があります。」
 - ナビの右端：「← デモ一覧へ」（リンク先 `https://rictaworks.jp/#demos`）。
@@ -21,6 +26,12 @@ Unity の画面を載せる HTML の殻（`src/web/`）の仕様です。見た�
 - テーマはライト固定です。`<meta name="color-scheme" content="light">` と CSS の `color-scheme: light` を書き、`prefers-color-scheme` の分岐は作りません。
 - 利回り・イベント・物価がすべて架空のモデル値であることを示す文を、`/` の本文に常時表示します。
 - 文字列の `alert`・`confirm`・`prompt` は使いません。絵文字は使いません。
+- 共有時の表示（Open Graph）：`og:title` と `og:description` は、それぞれ `title` と `description` と同じ文です。`og:type` は `website`、`og:locale` は `ja_JP`、`og:site_name` は「人生配分シミュレーション（デモ版）」です。`og:url` は公開ドメインの URL（`https://life-allocation.rictaworks.jp/` と `/legal`）だけを使います。404 ページの `og:url` はトップページの URL にします。
+
+## 配信（Vercel）
+
+- `src/web/vercel.json` で `cleanUrls` を使います。
+- すべてのパスに、次のヘッダーを付けます：`X-Content-Type-Options: nosniff`・`Referrer-Policy: strict-origin-when-cross-origin`・`X-Frame-Options: DENY`。
 
 ## アクセシビリティ
 
@@ -33,7 +44,9 @@ Unity の画面を載せる HTML の殻（`src/web/`）の仕様です。見た�
 ## 同意とアクセス解析（GA4）
 
 - 測定 ID：`G-C04W1XKS16`（`config.js` の `analytics.measurementId`）。
-- Consent Mode v2 で、既定の同意はすべて「拒否」です。読み込みの前に既定を設定します。
+- Consent Mode v2 で、既定の同意はすべて「拒否」です（`config.js` の `analytics.consentDefault`）。既定は、gtag.js を読み込む前に dataLayer へ積みます。
+- gtag.js（GA4）は、利用者が「許可」を選んだとき、または保存済みの「許可」で開いたときだけ読み込みます。未選択と「拒否」のときは、gtag.js の読み込みも Google への要求も行いません（`test/web/analytics-consent.spec.js` で確認）。
+- 同じ表示の中で「許可」から「拒否」に変えたときは、読み込み済みの gtag.js は外せないため、同意の更新だけを送ります。次の表示からは読み込みません。
 - 同意バナーに「許可」と「拒否」の 2 つのボタンを、同じ強さで置きます。
 - 選択は `localStorage` に保存します（キーは `life-allocation-sim.analytics-consent`。値は `granted` または `denied`）。保存された値が不正なら無視します。
 - 読み取りや保存に失敗しても、画面の操作は止めません。失敗した旨はコンソールに出します。同意の状態が分からないときは、同意バナーを表示します。
@@ -61,7 +74,7 @@ Unity の画面を載せる HTML の殻（`src/web/`）の仕様です。見た�
 ## 開発用サーバー（`src/web/dev-server.mjs`）
 
 - `APP_ENV` が `development` のときだけ起動します。それ以外は起動を拒否します（fail closed）。
-- 待ち受けは `127.0.0.1:8080`。静的ファイルを配り、`/api` を Rails（既定 `http://localhost:3000`）へ転送します。
+- 待ち受けは `127.0.0.1:8080`。静的ファイルを配り、`/api` を Rails（既定 `http://localhost:3000`）へ転送します。存在しないパスは、404 の応答で `404.html` を返します（Vercel と同じ）。
 - 転送のとき、`X-Real-IP` は接続元のアドレスで付け直します。クライアントが送った `X-Real-IP`・`X-Forwarded-*`・`Forwarded` は捨てます。
 - Rails が止まっているときは、502 または 504 を返します。本文は案内の文だけで、例外やスタックトレースは含みません。
 - 開発用サーバーのテストは、テストの中で `APP_ENV=development` を付けて起動します。

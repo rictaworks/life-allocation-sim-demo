@@ -3,6 +3,7 @@
 const { test, expect } = require('@playwright/test');
 const support = require('./support');
 
+const { readDataLayer } = support;
 const BANNER_TEXT = 'これはデモ版です。データはサーバー再起動時にリセットされる場合があります。';
 const FICTION_TEXT = '利回り・イベント・物価は、すべて架空のモデル値です。';
 const CONSENT_REGION_NAME = 'アクセス解析の利用について';
@@ -67,15 +68,6 @@ function styleOf(locator, names) {
     const style = getComputedStyle(el);
     return Object.fromEntries(props.map((name) => [name, style.getPropertyValue(name)]));
   }, names);
-}
-
-/**
- * dataLayer の内容を配列にして読む（arguments は配列にする）。
- * @param {import('@playwright/test').Page} page
- * @returns {Promise<any[][]>}
- */
-function readDataLayer(page) {
-  return page.evaluate(() => Array.from(window.dataLayer ?? [], (entry) => Array.from(entry)));
 }
 
 /**
@@ -332,28 +324,6 @@ test.describe('Web 殻', () => {
     await expect(page.getByRole('link', { name: 'ご相談はこちら' })).toHaveAttribute('href', 'https://rictaworks.jp/');
     const text = await page.locator('body').innerText();
     expect(text).not.toMatch(/である|だ。/);
-  });
-
-  test('GA4 は同意の既定を「拒否」にしてから、測定 ID で読み込む', async ({ page }) => {
-    /** @type {string[]} */
-    const scriptRequests = [];
-    page.on('request', (request) => {
-      if (GTM_PATTERN.test(request.url())) scriptRequests.push(request.url());
-    });
-    await page.goto(`${dev.url}/`);
-    await expect.poll(() => scriptRequests.length).toBeGreaterThan(0);
-    expect(scriptRequests[0]).toBe(`https://www.googletagmanager.com/gtag/js?id=${config.analytics.measurementId}`);
-    const entries = await readDataLayer(page);
-    const defaultIndex = entries.findIndex((entry) => entry[0] === 'consent' && entry[1] === 'default');
-    const configIndex = entries.findIndex((entry) => entry[0] === 'config');
-    expect(defaultIndex).toBeGreaterThanOrEqual(0);
-    expect(configIndex).toBeGreaterThan(defaultIndex);
-    const defaults = entries[defaultIndex][2];
-    expect(defaults.analytics_storage).toBe('denied');
-    expect(defaults.ad_storage).toBe('denied');
-    expect(defaults.ad_user_data).toBe('denied');
-    expect(defaults.ad_personalization).toBe('denied');
-    expect(entries[configIndex][1]).toBe(config.analytics.measurementId);
   });
 
   test('同意バナーの「許可」と「拒否」は同じ強さのボタンにする', async ({ page }) => {

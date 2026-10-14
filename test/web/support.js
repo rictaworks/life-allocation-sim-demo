@@ -12,6 +12,17 @@ const DEV_SERVER_PATH = path.join(WEB_ROOT, 'dev-server.mjs');
 const LOCAL_HOST = '127.0.0.1';
 // 接続先のない Rails の代わり（discard 用のポート。接続は拒否される）
 const UNREACHABLE_ORIGIN = 'http://127.0.0.1:9';
+// src/web の HTML ページ（Vercel に配るページと、存在しないパスの 404 ページ）
+const PAGE_FILES = Object.freeze(['index.html', 'legal.html', '404.html']);
+
+/**
+ * dataLayer の内容を配列にして読む（arguments は配列にする）。
+ * @param {import('@playwright/test').Page} page
+ * @returns {Promise<any[][]>}
+ */
+function readDataLayer(page) {
+  return page.evaluate(() => Array.from(window.dataLayer ?? [], (entry) => Array.from(entry)));
+}
 
 /**
  * src/web の ES モジュールを読み込む。
@@ -173,6 +184,7 @@ module.exports = {
   REPO_ROOT,
   WEB_ROOT,
   DEV_SERVER_PATH,
+  PAGE_FILES,
   importWebModule,
   loadConfig,
   startDevServer,
@@ -180,5 +192,6 @@ module.exports = {
   runDevServerCli,
   listWebSourceFiles,
   scanJavaScript,
+  readDataLayer,
   UNREACHABLE_ORIGIN,
 };

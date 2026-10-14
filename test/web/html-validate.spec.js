@@ -5,7 +5,7 @@ const { test, expect } = require('@playwright/test');
 const { HtmlValidate } = require('html-validate/node');
 const support = require('./support');
 
-const PAGES = ['index.html', 'legal.html'];
+const PAGES = support.PAGE_FILES;
 
 test.describe('html-validate（QC01）', () => {
   for (const page of PAGES) {

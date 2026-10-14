@@ -88,14 +88,21 @@ function sendText(res, status, message, headers = {}) {
 }
 
 /**
+ * ファイルを本文として返す。
  * @param {http.IncomingMessage} req
  * @param {http.ServerResponse} res
  * @param {string} file
+ * @param {number} status 応答の状態（通常のファイルは 200、存在しないパスの 404.html は 404）
  */
-async function sendStaticFile(req, res, file) {
+async function sendStaticFile(req, res, file, status) {
   const stats = await fs.promises.stat(file);
-  res.writeHead(200, {
-    'Content-Type': config.mimeTypes[path.extname(file)] ?? config.defaultMimeType,
+  const extension = path.extname(file);
+  // 対応していない拡張子は、既定の型（バイト列）で返す
+  const contentType = Object.hasOwn(config.mimeTypes, extension)
+    ? config.mimeTypes[extension]
+    : config.defaultMimeType;
+  res.writeHead(status, {
+    'Content-Type': contentType,
     'Content-Length': stats.size,
     'Cache-Control': 'no-store',
     'X-Content-Type-Options': 'nosniff',
@@ -166,7 +173,12 @@ function proxyToRails(req, res, ctx) {
     for (const [name, value] of Object.entries(upstreamRes.headers)) {
       if (value !== undefined && !config.hopByHopHeaders.includes(name)) responseHeaders[name] = value;
     }
-    res.writeHead(upstreamRes.statusCode ?? 502, responseHeaders);
+    if (typeof upstreamRes.statusCode !== 'number') {
+      upstreamRes.resume();
+      sendText(res, 502, config.messages.upstreamUnavailable);
+      return;
+    }
+    res.writeHead(upstreamRes.statusCode, responseHeaders);
     upstreamRes.pipe(res);
   });
   upstream.on('error', (error) => {
@@ -174,7 +186,9 @@ function proxyToRails(req, res, ctx) {
       res.destroy();
       return;
     }
-    console.error(config.log.upstreamFailed, error.code ?? error.message);
+    // 接続の失敗はエラーコード（例：ECONNREFUSED）を表示する。コードが無いときはメッセージを表示する。
+    const detail = typeof error.code === 'string' ? error.code : error.message;
+    console.error(config.log.upstreamFailed, detail);
     if (timedOut) {
       sendText(res, 504, config.messages.upstreamTimeout);
     } else {
@@ -193,9 +207,13 @@ function proxyToRails(req, res, ctx) {
  * @param {{ root: string, rails: { host: string, port: number }, upstreamTimeoutMs: number }} ctx
  */
 async function handleRequest(req, res, ctx) {
+  if (typeof req.url !== 'string') {
+    sendText(res, 400, config.messages.badRequest);
+    return;
+  }
   let pathname;
   try {
-    pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
+    pathname = new URL(req.url, config.requestUrlBase).pathname;
   } catch {
     sendText(res, 400, config.messages.badRequest);
     return;
@@ -219,10 +237,11 @@ async function handleRequest(req, res, ctx) {
     throw error;
   }
   if (file === null) {
-    sendText(res, 404, config.messages.notFound);
+    // 存在しないパスは 404 の応答で 404.html を返す（Vercel と同じ。本文に内部情報を含めない）
+    await sendStaticFile(req, res, path.join(ctx.root, config.notFoundFileName), 404);
     return;
   }
-  await sendStaticFile(req, res, file);
+  await sendStaticFile(req, res, file, 200);
 }
 
 /**
@@ -291,22 +310,26 @@ function closeServer(server) {
  * @returns {Promise<{ url: string, close: () => Promise<void> }>}
  */
 export async function startDevServer(options = {}) {
-  assertDevelopmentEnvironment(options.env ?? process.env);
+  const env = options.env === undefined ? process.env : options.env;
+  assertDevelopmentEnvironment(env);
   const defaultRoot = path.dirname(fileURLToPath(import.meta.url));
+  const root = options.root === undefined ? defaultRoot : options.root;
+  const railsOrigin = options.railsOrigin === undefined ? config.railsOrigin : options.railsOrigin;
   const ctx = {
-    root: path.resolve(options.root ?? defaultRoot),
-    rails: parseRailsOrigin(options.railsOrigin ?? config.railsOrigin),
+    root: path.resolve(root),
+    rails: parseRailsOrigin(railsOrigin),
     upstreamTimeoutMs: config.upstreamTimeoutMs,
   };
-  const host = options.host ?? config.host;
+  const host = options.host === undefined ? config.host : options.host;
+  const port = options.port === undefined ? config.port : options.port;
   const server = createServer(ctx);
-  await listen(server, options.port ?? config.port, host);
+  await listen(server, port, host);
   const address = server.address();
   if (address === null || typeof address === 'string') {
     throw new Error(config.messages.internalError);
   }
   return {
-    url: `http://${host}:${address.port}`,
+    url: config.localUrlTemplate.replace('{host}', host).replace('{port}', String(address.port)),
     close: () => closeServer(server),
   };
 }
