@@ -4,9 +4,12 @@
   "private": true,
   "description": "life-allocation-sim-demo の E2E テスト（Playwright）",
   "scripts": {
-    "test": "playwright test"
+    "test": "playwright test web",
+    "test:pr15": "playwright test -c pr15/playwright.config.js",
+    "validate:html": "html-validate ../src/web/index.html ../src/web/legal.html ../src/web/404.html"
   },
   "devDependencies": {
-    "@playwright/test": "1.64.0"
+    "@playwright/test": "1.64.0",
+    "html-validate": "11.16.1"
   }
 }

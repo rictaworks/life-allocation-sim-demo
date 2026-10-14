@@ -1,40 +1,19 @@
-# SQLite. Versions 3.8.0 and up are supported.
-#   gem install sqlite3
+# SQLite。保存先は DATABASE_PATH（絶対パス。本番は Railway のボリューム上）。
+# 既定値では補わない。起動時の検査（config/app_settings.rb）で存在と形式を確かめる。
 #
-#   Ensure the SQLite 3 gem is defined in your Gemfile
-#   gem "sqlite3"
-#
+# SQLite の書き込みは既定で BEGIN IMMEDIATE（件数の判定と記録を直列にする）。
+# 接続数は config/server.yml（database.max_connections）。RAILS_MAX_THREADS が設定されていれば、その値を使う。
 default: &default
   adapter: sqlite3
-  max_connections: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+  database: <%= ENV.fetch("DATABASE_PATH") %>
+  max_connections: <%= ServerSettings.database_max_connections %>
   timeout: 5000
 
 development:
   <<: *default
-  database: storage/development.sqlite3
 
-# Warning: The database defined as "test" will be erased and
-# re-generated from your development database when you run "rake".
-# Do not set this db to the same as development or production.
 test:
   <<: *default
-  database: storage/test.sqlite3
 
-# Store production database in the storage/ directory, which by default
-# is mounted as a persistent Docker volume in config/deploy.yml.
 production:
-  primary:
-    <<: *default
-    database: storage/production.sqlite3
-  cache:
-    <<: *default
-    database: storage/production_cache.sqlite3
-    migrations_paths: db/cache_migrate
-  queue:
-    <<: *default
-    database: storage/production_queue.sqlite3
-    migrations_paths: db/queue_migrate
-  cable:
-    <<: *default
-    database: storage/production_cable.sqlite3
-    migrations_paths: db/cable_migrate
+  <<: *default

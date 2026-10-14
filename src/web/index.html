@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <meta name="description" content="給料を生活費・貯蓄・投資に配分し、22歳から65歳までの資産推移を体験する教育用のデモです。">
+    <meta property="og:title" content="人生配分シミュレーション（デモ版）">
+    <meta property="og:description" content="給料を生活費・貯蓄・投資に配分し、22歳から65歳までの資産推移を体験する教育用のデモです。">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://life-allocation.rictaworks.jp/">
+    <meta property="og:site_name" content="人生配分シミュレーション（デモ版）">
+    <meta property="og:locale" content="ja_JP">
+    <title>人生配分シミュレーション（デモ版）</title>
+    <link rel="stylesheet" href="css/site.css">
+    <script type="module" src="js/app.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">本文へ移動</a>
+    <header>
+      <p class="demo-banner">これはデモ版です。データはサーバー再起動時にリセットされる場合があります。</p>
+      <nav class="site-nav" aria-label="主要">
+        <a href="/">人生配分シミュレーション</a>
+        <a class="site-nav__back" href="https://rictaworks.jp/#demos">← デモ一覧へ</a>
+      </nav>
+    </header>
+    <section class="consent" id="consent-banner" aria-labelledby="consent-title" hidden>
+      <p id="consent-title" class="consent__title" tabindex="-1">アクセス解析の利用について</p>
+      <p>このサイトでは、利用状況を把握するためにアクセス解析（Google アナリティクス）を使うかどうかを選んでください。「許可」を選んだときだけ、Google アナリティクスを読み込み、利用状況を計測します。「拒否」を選ぶと、以後の表示では読み込みません。どちらを選んでも、このサイトの操作には影響しません。選択はこのブラウザに保存されます。</p>
+      <div class="consent__actions">
+        <button type="button" class="button" data-consent-choice="granted">許可</button>
+        <button type="button" class="button" data-consent-choice="denied">拒否</button>
+      </div>
+    </section>
+    <main id="main" tabindex="-1">
+      <h1>人生配分シミュレーション</h1>
+      <p>給料を「生活費・貯蓄・投資」に配分し、22歳から65歳までの資産推移を体験できます。</p>
+      <p class="notice">利回り・イベント・物価は、すべて架空のモデル値です。このサイトは教育目的のデモです。実在の金融商品や個別の投資判断を示すものではありません。</p>
+      <section aria-labelledby="sim-title">
+        <h2 id="sim-title">シミュレーション</h2>
+        <noscript><p>この画面を表示するには、JavaScript を有効にしてください。</p></noscript>
+        <p id="unity-status" class="unity-status" role="status" hidden></p>
+        <canvas id="unity-canvas" tabindex="0" aria-describedby="unity-status"></canvas>
+      </section>
+    </main>
+    <footer>
+      <nav aria-label="フッター">
+        <ul class="footer-links">
+          <li><a href="/legal#terms">利用規約</a></li>
+          <li><a href="/legal#disclaimer">免責事項</a></li>
+          <li><a href="/legal#contact">連絡先</a></li>
+        </ul>
+      </nav>
+      <p><button type="button" class="button button--sub" id="consent-reopen" hidden>アクセス解析の設定を変更</button></p>
+    </footer>
+    <a class="consult-link" href="https://rictaworks.jp/">ご相談はこちら</a>
+  </body>
+</html>

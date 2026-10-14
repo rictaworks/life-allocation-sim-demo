@@ -61,6 +61,19 @@ src-tauri/target/
 /MemoryCaptures/
 *.csproj
 *.sln
+# 上の / 付きの行はルート固定のため、src/unity と src/web/unity の生成物はここで範囲を明示する
+src/unity/Library/
+src/unity/Temp/
+src/unity/Obj/
+src/unity/Logs/
+src/unity/UserSettings/
+src/unity/Build/
+src/unity/MemoryCaptures/
+# Domain Core の DLL（コピーして使う。コミットしない）。DLL のフォルダの中の .meta も、この行で除外される
+# Assets 配下の .meta は GUID を含むため Git に載せる。除外するのは上の DLL のフォルダだけ
+src/unity/Assets/Plugins/DomainCore/
+# WebGL のビルド出力（Build・TemplateData・StreamingAssets）
+src/web/unity/
 
 # --- Playwright ---
 test-results/

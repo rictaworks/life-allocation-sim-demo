@@ -1,0 +1,28 @@
+# ログと内部の例外の文言（応答には出さない）。文言は形式（%{name} の差し込み）で持ち、呼ぶ側が値を渡す。
+# 読む側は app/services/internal_messages.rb。利用者に見せる文言は config/locales/ja.yml に置く。
+# 既定値では補わない（キーが無ければ例外になる）。ログの 1 行の形は、ここに書いたとおりに出る。
+shared:
+  api:
+    unexpected_error: "[api] unexpected %{class_name} in %{controller}#%{action}"
+    blocked_host: "[api] blocked host: %{hosts}"
+    unknown_error_code: "unknown ApiError code: %{code}"
+    unmapped_status: "[api] unmapped status %{status} for %{class_name}"
+  turn:
+    saved_turn_missing: "[turn] saved turn is missing for a requested replay"
+    replay_mismatch: "[turn] replay result does not match the requested turn"
+  core_host:
+    exit_status: "[core_host] %{command} exit status %{status}"
+    exit_status_error_type: "[core_host] %{command} exit status %{status} error type %{error_type}"
+    rule_code_unmapped: "[core_host] rule code is not mapped: %{code}"
+    shape_mismatch: "[core_host] unexpected output shape at %{path}"
+    output_not_json: "[core_host] output is not JSON"
+    no_slot: "[core_host] no slot within the wait limit"
+    timed_out: "[core_host] timed out"
+    process_failed: "[core_host] process failed"
+    input_limit_exceeded: "[core_host] input exceeds the limit"
+    dll_unavailable: "[core_host] dll is not available"
+    process_time_limit: "time limit exceeded"
+    process_output_limit: "output limit exceeded"
+    unknown_shape_type: "unknown shape type"
+  request_log:
+    started: "Started %{method} \"%{path}\" at %{time}"

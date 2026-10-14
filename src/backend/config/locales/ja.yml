@@ -1,0 +1,33 @@
+# 日本語の文言。API の応答（api_errors）、起動時の検査の文言（startup）、全データ削除の結果（reset_all）。
+# コードには文言を直接書かない（spec/config/hardcoded_strings_spec.rb が検査する）。
+ja:
+  api_errors:
+    bad_request: "リクエストの内容が正しくありません。"
+    origin_forbidden: "この操作は許可されていません。"
+    unsupported_media_type: "送信の形式が正しくありません。JSON で送信してください。"
+    payload_too_large: "送信の内容が大きすぎます。"
+    rate_limited: "操作が多すぎます。しばらく待ってから、もう一度お試しください。"
+    not_found: "お探しの内容は見つかりません。"
+    internal_error: "サーバーで問題が起きました。しばらく待ってから、もう一度お試しください。"
+    session_required: "セッションが確認できません。ページを開き直してから、もう一度お試しください。"
+    difficulty_missing: "難易度を選んでください。"
+    difficulty_unknown: "選択された難易度は見つかりません。一覧から選び直してください。"
+    allocation_negative: "配分に負の値は指定できません。"
+    allocation_step_mismatch: "配分は決められた刻み幅で指定してください。"
+    allocation_sum_mismatch: "配分の合計が正しくありません。配分を入れ直してください。"
+    game_finished: "このゲームは終了しているため、操作できません。"
+    game_not_found: "ゲームが見つかりません。ゲームを始めてから、もう一度お試しください。"
+    turn_conflict: "この年の番号が正しくありません。画面を読み込み直してから、もう一度お試しください。"
+    turn_allocation_mismatch: "この年の配分は、すでに別の内容で記録されています。画面を読み込み直して、ご確認ください。"
+    service_unavailable: "混み合っています。しばらく待ってから、もう一度お試しください。"
+  reset_all:
+    summary: "全データを削除しました。セッション %{sessions} 件、ゲーム %{games} 件、ターン %{turns} 件、要求の記録 %{request_events} 件。"
+  startup:
+    missing_env: "%{name} が設定されていません。起動を中止します。"
+    invalid_rails_env: "%{name} は development・test・production のどれかにしてください。"
+    development_app_env_outside_development: "%{name} を development にするときは、RAILS_ENV も development にしてください。"
+    development_rails_env_without_app_env: "RAILS_ENV を development にするときは、%{name} も development にしてください。"
+    short_secret_key_base: "%{name} は 64 文字以上にしてください。"
+    relative_database_path: "%{name} は絶対パスで指定してください。"
+    invalid_app_origin: "%{name} は scheme://ホスト[:ポート] の形で、小文字で指定してください（末尾の / は不可）。"
+    https_required_app_origin: "%{name} は本番では https で指定してください。"

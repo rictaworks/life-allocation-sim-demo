@@ -1,0 +1,42 @@
+# 保存 API の設定値。文字列と数値はここに置き、コードには直接書かない。
+# 既定値で補う設定は無い（読めなければ例外になる）。
+shared:
+  session:
+    cookie_name: "__Host-lasd_session"
+    ttl_days: 7
+    token_bytes: 32
+  client_ip:
+    header: "X-Real-IP"
+  request:
+    body_limit_bytes: 8192
+    json_media_type: "application/json"
+    json_charset: "utf-8"
+  request_digest:
+    key_salt: "request_events.scope_digest"
+  # 匿名セッションの発行の応答の値（session.status）。
+  response:
+    session_status:
+      created: "created"
+      existing: "existing"
+  # ヘッダー名・環境変数名（Rack の env のキー）と、Content-Type の形。JSON の値は json_media_type と json_charset から組み立てる。
+  http:
+    retry_after_header: "Retry-After"
+    content_type_header: "Content-Type"
+    content_type_format: "%{media_type}; charset=%{charset}"
+    origin_env_key: "HTTP_ORIGIN"
+    content_length_env_key: "CONTENT_LENGTH"
+    exception_env_key: "action_dispatch.exception"
+    blocked_hosts_env_key: "action_dispatch.blocked_hosts"
+  rate_limits:
+    session_issue:
+      - { window_seconds: 60, limit: 10 }
+    # ゲームの開始は再計算ホストを呼ぶ重い操作のため、保存と同じ頻度で数える。
+    game_start:
+      - { window_seconds: 1, limit: 1 }
+      - { window_seconds: 60, limit: 20 }
+    # 保存（201）と、保存済みの番号の再送（200）は、この同じ枠で数える（再送もホストを呼ぶため）。
+    turn_save:
+      - { window_seconds: 1, limit: 1 }
+      - { window_seconds: 60, limit: 20 }
+    # 現在のゲームの取得（GET /api/game）は、状態を変えない読み取りのため、頻度を数えない（規則は置かない）。
+    # ホストの負荷は、再計算ホストの同時実行の上限と制限時間で守る（core_host の設定）。

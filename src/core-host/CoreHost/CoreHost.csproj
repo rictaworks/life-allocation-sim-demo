@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    再計算ホスト（requirements.md 4.5・2 章）。Domain Core を呼んで結果を JSON にするだけの薄い層で、規則は持たない。
+    ビルド：dotnet build src/core-host/CoreHost -c Release（出力：bin/Release/net10.0/CoreHost.dll）
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\core\DomainCore\DomainCore.csproj" />
+  </ItemGroup>
+
+  <!-- 単体テストは Main ではなく内部の関数（CoreHostRunner.Run）を直接呼ぶ。子プロセスを起動しない -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="CoreHost.Tests" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,6 @@
+# 受け入れテスト（DomainCore.AcceptanceTests）の .NET のビルド成果物
+bin/
+obj/
+
+# ルートの .gitignore は Unity 向けに *.csproj を除外している。このフォルダの .NET のプロジェクトファイルは追跡する
+!*.csproj

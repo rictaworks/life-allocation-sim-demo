@@ -1,0 +1,42 @@
+# 再計算ホスト（CoreHost）の呼び出し設定。入出力の形は src/core-host/CoreHost/Protocol.md が正。
+# 数値と名前はここに置き、コードには直接書かない。既定値では補わない（読めなければ例外になる）。
+shared:
+  # 実行ファイルと、DLL の絶対パスを入れる環境変数。引数は配列で渡し、シェルを介さない。
+  executable: "dotnet"
+  dll_env_key: "CORE_HOST_DLL"
+  # 子プロセスに渡す環境変数。ここに無いものは渡さない（秘密の値・DB の場所など）。
+  child_env_keys:
+    - "PATH"
+    - "HOME"
+  child_env:
+    DOTNET_NOLOGO: "1"
+    DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  # 制限時間（秒）。超えたらプロセスを止めて 503。
+  timeout_seconds: 5
+  # 同時実行の上限と、枠を待つ時間（秒）。待ちきれなければ 503。
+  max_concurrent: 2
+  wait_seconds: 2
+  # 入力の上限（バイト）。超えたら起動しない。出力と標準エラーは、読む量を制限する。
+  max_input_bytes: 65536
+  max_output_bytes: 262144
+  max_stderr_bytes: 4096
+  commands:
+    init: "init"
+    replay: "replay"
+  exit_codes:
+    success: 0
+    rule_violation: 2
+  # 終了コード 2 の理由コードのうち、API のエラーコードへ対応させるもの（ApiError::STATUSES にあること）。
+  # ほかの理由コード（request_invalid など）は、Rails が作った要求の不具合として内部エラーにする。
+  rule_violation_codes:
+    - "difficulty_missing"
+    - "difficulty_unknown"
+    - "allocation_negative"
+    - "allocation_step_mismatch"
+    - "allocation_sum_mismatch"
+    - "game_finished"
+  # ゲームの状態の文字列（ホストの state.status と同じ）。Rails は、プレイ中かどうかの判定に使う。
+  game_statuses:
+    playing: "playing"
+    completed: "completed"
+    bankrupt: "bankrupt"

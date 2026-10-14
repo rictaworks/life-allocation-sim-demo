@@ -1,0 +1,193 @@
+/* 最小限の CSS。テーマはライト固定。フォーカスの表示（outline）はブラウザの既定を使う。 */
+:root {
+  color-scheme: light;
+  --color-text: #1f2328;
+  --color-bg: #ffffff;
+  --color-link: #0a58ca;
+  --color-banner-bg: #ffbf00;
+  --color-banner-text: #1f1f1f;
+  --color-border: #d0d7de;
+  --color-panel: #f6f8fa;
+  --color-canvas-bg: #e6e8eb;
+  --space-gutter: 16px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.6;
+}
+
+a {
+  color: var(--color-link);
+}
+
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: var(--space-gutter);
+  z-index: 10;
+  padding: 8px 12px;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.skip-link:focus {
+  top: 8px;
+}
+
+.demo-banner {
+  margin: 0;
+  padding: 12px var(--space-gutter);
+  background: var(--color-banner-bg);
+  color: var(--color-banner-text);
+  font-weight: 700;
+}
+
+.site-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 12px var(--space-gutter);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.site-nav__back {
+  margin-left: auto;
+}
+
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--space-gutter);
+}
+
+h1 {
+  margin: 16px 0 8px;
+  font-size: 1.5rem;
+}
+
+h2 {
+  margin: 24px 0 8px;
+  font-size: 1.25rem;
+}
+
+.notice {
+  padding: 8px 12px;
+  border-left: 4px solid var(--color-banner-bg);
+}
+
+.consent {
+  margin: 0;
+  padding: var(--space-gutter);
+  background: var(--color-panel);
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* 同意バナーの題名は見出しにしない（見出しの順序を h1 から始めるため）。見た目は見出しの既定と同じにする。 */
+.consent__title {
+  margin: 0 0 8px;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.consent__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.button {
+  min-width: 96px;
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 2px solid var(--color-link);
+  border-radius: 4px;
+  background: var(--color-link);
+  color: #ffffff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.button--sub {
+  background: var(--color-bg);
+  color: var(--color-link);
+}
+
+.unity-status {
+  margin: 8px 0;
+}
+
+#unity-canvas {
+  display: block;
+  width: 100%;
+  max-width: 960px;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  background: var(--color-canvas-bg);
+}
+
+footer {
+  margin-top: 32px;
+  padding: var(--space-gutter);
+  border-top: 1px solid var(--color-border);
+}
+
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/*
+ * 相談ボタン。幅 1280px 以上では右下に固定する（本文と重ならない幅。計測は test/web/consult-overlap.spec.js）。
+ * それより狭い幅では固定にせず、本文の流れの末尾（フッターの後）に置く。スマホで本文を隠さないため。
+ */
+.consult-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin: var(--space-gutter);
+  padding: 8px 16px;
+  border-radius: 4px;
+  background: var(--color-link);
+  color: #ffffff;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+@media (min-width: 1280px) {
+  body {
+    /* 固定の相談ボタンが本文の末尾を隠さないための余白 */
+    padding-bottom: 5.5rem;
+  }
+
+  .consult-link {
+    position: fixed;
+    right: var(--space-gutter);
+    bottom: var(--space-gutter);
+    z-index: 5;
+    margin: 0;
+  }
+}
+
+.legal-page section {
+  margin-bottom: 24px;
+}
+
+[hidden] {
+  display: none !important;
+}

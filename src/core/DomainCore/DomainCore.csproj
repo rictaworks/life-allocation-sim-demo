@@ -6,4 +6,9 @@
     <LangVersion>9.0</LangVersion>
   </PropertyGroup>
 
+  <!-- 単体テストから内部の関数（イベントの当たりの選び方・満足度の計算）を直接確かめるため。公開の API には含めない -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="DomainCore.Tests" />
+  </ItemGroup>
+
 </Project>
