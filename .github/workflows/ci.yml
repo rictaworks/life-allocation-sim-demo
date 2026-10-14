@@ -1,5 +1,6 @@
 # CI。pull_request と main への push で、core（.NET）・backend（Rails）・web（Playwright）を検査する。
 # Unity 本体のビルドは CI に入れない（静的検査は web ジョブで Node の標準テストとして実行する）。理由は README.md の「CI」の節に書いている。
+# 外部の Action（uses）は、可変のタグやブランチではなく、コミット SHA で固定します。行の末尾の # の後ろに版（タグ名）を書きます。版を上げるときは、SHA と版を一緒に直します。
 name: CI
 
 on:
@@ -17,10 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '10.0.x'
       - name: .NET の版を表示する
@@ -45,15 +46,15 @@ jobs:
       run:
         working-directory: src/backend
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '10.0.x'
       - name: 再計算ホストのビルド（Release）
         run: dotnet build "${GITHUB_WORKSPACE}/src/core-host/CoreHost" -c Release
-      - uses: ruby/setup-ruby@v1
+      - uses: ruby/setup-ruby@651ff0d62c5c79bed6d53ec518387aae20e72c1a # v1.329.0
         with:
           ruby-version: '3.4.11'
           bundler-cache: true
@@ -78,10 +79,10 @@ jobs:
       run:
         working-directory: test
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '22'
           cache: npm

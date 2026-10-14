@@ -44,7 +44,7 @@ erDiagram
     }
     REQUEST_EVENTS {
         integer id PK
-        string kind "session_issue・game_start・turn_save・game_read"
+        string kind "session_issue・game_start・turn_save"
         string scope_digest "HMAC のダイジェスト（IP やトークンは保存しない）"
         datetime created_at
     }

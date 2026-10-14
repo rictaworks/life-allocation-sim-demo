@@ -8,7 +8,7 @@ namespace CoreHost.Config
         /// <summary>終了コード：成功。</summary>
         public const int ExitSuccess = 0;
 
-        /// <summary>終了コード：内部エラー。例外の詳細は、標準出力にも標準エラーにも出さない。</summary>
+        /// <summary>終了コード：内部エラー。標準エラーには、例外の型名だけを 1 行で出します（メッセージ・入力値・スタックトレースは出しません）。</summary>
         public const int ExitInternalError = 1;
 
         /// <summary>終了コード：入力不正・規則違反。</summary>

@@ -68,8 +68,24 @@ test('U13 「許可」を選ぶと保存され、次の訪問では分析の同�
   expect(await readDataLayer(page)).toContainEqual(['consent', 'update', { analytics_storage: cfg.consent.grantedValue }]);
 });
 
-test('U14 GA4 は測定 ID（G-C04W1XKS16）で読み込まれ、config が送られる', async ({ page }) => {
+test('U14 GA4 は「許可」を選んだときだけ測定 ID（G-C04W1XKS16）で読み込まれ、未選択と「拒否」では Google への要求が 0 件', async ({ page }) => {
+  // 未選択：バナーが出ている間は、gtag.js も Google への要求も出ず、計測の命令（config）も積まれません。
   await page.goto('/');
+  await expect(banner(page)).toBeVisible();
+  await page.waitForLoadState('networkidle');
+  expect(isolation.gtmRequests).toEqual([]);
+  expect(await readDataLayer(page)).not.toContainEqual(['config', cfg.consent.measurementId]);
+  // 拒否：同意の更新だけを積みます。開き直しても読み込みません。
+  await choice(page, cfg.consent.deniedLabel).click();
+  await expect(banner(page)).toBeHidden();
+  await page.reload();
+  await expect(banner(page)).toBeHidden();
+  await page.waitForLoadState('networkidle');
+  expect(isolation.gtmRequests).toEqual([]);
+  // 許可：この選択で初めて読み込み、測定 ID の config を送ります。
+  await reopenButton(page).click();
+  await choice(page, cfg.consent.grantedLabel).click();
+  await expect(banner(page)).toBeHidden();
   await expect.poll(() => isolation.gtmRequests.length).toBeGreaterThan(0);
   expect(isolation.gtmRequests.some((url) => url.includes(`id=${cfg.consent.measurementId}`))).toBe(true);
   expect(await readDataLayer(page)).toContainEqual(['config', cfg.consent.measurementId]);
